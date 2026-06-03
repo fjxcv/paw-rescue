@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
+import { SITE_NAME } from '../constants/site';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = location.state?.from?.pathname || '/';
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,15 +24,15 @@ const Login = () => {
       const response = await authAPI.login(formData);
       localStorage.setItem('token', response.data.access);
       localStorage.setItem('user', JSON.stringify(response.data.user));
-      navigate('/gallery');
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       console.error('Login error:', err);
       if (err.response?.status === 401) {
-        setError('Invalid username or password. Please try again.');
+        setError('用户名或密码错误，请重试。');
       } else if (err.response?.status === 400) {
-        setError('Please check your credentials and try again.');
+        setError('请检查您的登录信息后再试。');
       } else {
-        setError('Login failed. Please try again later.');
+        setError('登录失败，请稍后重试。');
       }
     } finally {
       setLoading(false);
@@ -43,13 +46,13 @@ const Login = () => {
           <div className="logo-placeholder mb-3">
             <i className="fas fa-paw fa-2x text-paw"></i>
           </div>
-          <h3 className="fw-bold mt-2 text-paw">Welcome to PetConnect</h3>
-          <p className="text-muted">Login to continue your pet journey 🐾</p>
+          <h3 className="fw-bold mt-2 text-paw">欢迎使用 {SITE_NAME}</h3>
+          <p className="text-muted">登录以继续您的救助之旅</p>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label htmlFor="username" className="form-label fw-semibold">Username</label>
+            <label htmlFor="username" className="form-label fw-semibold">用户名</label>
             <input
               type="text"
               className="form-control form-control-lg rounded-3"
@@ -58,12 +61,12 @@ const Login = () => {
               value={formData.username}
               onChange={handleChange}
               required
-              placeholder="Enter your username"
+              placeholder="请输入用户名"
             />
           </div>
 
           <div className="mb-3">
-            <label htmlFor="password" className="form-label fw-semibold">Password</label>
+            <label htmlFor="password" className="form-label fw-semibold">密码</label>
             <input
               type="password"
               className="form-control form-control-lg rounded-3"
@@ -72,7 +75,7 @@ const Login = () => {
               value={formData.password}
               onChange={handleChange}
               required
-              placeholder="Enter your password"
+              placeholder="请输入密码"
             />
           </div>
 
@@ -80,20 +83,25 @@ const Login = () => {
             <div className="alert alert-danger rounded-3">{error}</div>
           )}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn-paw w-100 py-2 rounded-3 fw-semibold"
             disabled={loading}
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? '登录中...' : '登录'}
           </button>
         </form>
 
         <div className="text-center mt-3">
           <p className="text-muted">
-            Don't have an account?{' '}
+            <Link to="/forgot-password" className="text-decoration-none text-paw fw-semibold">
+              忘记密码？
+            </Link>
+          </p>
+          <p className="text-muted">
+            还没有账号？{' '}
             <Link to="/register" className="text-decoration-none text-paw fw-semibold">
-              Register here
+              立即注册
             </Link>
           </p>
         </div>

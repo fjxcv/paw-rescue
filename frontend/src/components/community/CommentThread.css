@@ -1,0 +1,156 @@
+.comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comment-floor {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.comment-floor-no {
+  flex-shrink: 0;
+  width: 36px;
+  text-align: center;
+  font-weight: 600;
+  color: #6c757d;
+  font-size: 0.85rem;
+  padding-top: 4px;
+}
+
+.comment-floor-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.comment-author {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.comment-meta {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.comment-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.comment-action-btn {
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-size: 0.85rem;
+  color: #6c757d;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.comment-action-count {
+  font-size: 0.8rem;
+}
+
+.comment-action-danger {
+  color: #dc3545;
+}
+
+.comment-action-danger:hover {
+  color: #bb2d3b;
+}
+
+.comment-action-btn:hover {
+  color: #198754;
+}
+
+.comment-action-btn.active {
+  color: #dc3545;
+}
+
+.comment-content {
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.comment-replies {
+  margin-top: 10px;
+  padding-left: 12px;
+  border-left: 2px solid #e9ecef;
+}
+
+.comment-reply-item {
+  margin-bottom: 10px;
+}
+
+.comment-reply-item:last-child {
+  margin-bottom: 0;
+}
+
+.comment-reply-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.comment-reply-to {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.comment-expand-btn {
+  border: none;
+  background: none;
+  color: #198754;
+  font-size: 0.8rem;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.comment-reply-form {
+  margin-top: 8px;
+}
+
+.badge-op {
+  font-size: 0.65rem;
+}
+
+.comment-compose-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.comment-compose-input {
+  flex: 1 1 200px;
+  min-width: 0;
+  margin-bottom: 0 !important;
+}
+
+.comment-compose-submit {
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}

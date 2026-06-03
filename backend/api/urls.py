@@ -1,27 +1,18 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import (
-    RegisterView, ProfileView, PetViewSet, AdoptionRequestViewSet, GalleryViewSet
-)
+from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
-from .token_views import CustomTokenObtainPairView
 
-# Create router and register viewsets
-router = DefaultRouter()
-router.register(r'pets', PetViewSet)
-router.register(r'gallery', GalleryViewSet)
-router.register(r'adoption-requests', AdoptionRequestViewSet)
+from common.views import UploadView
 
 urlpatterns = [
-    # Authentication
-    path('register/', RegisterView.as_view(), name='register'),
-    path('login/', CustomTokenObtainPairView.as_view(), name='login'),
-    path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('', include('accounts.urls')),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
-    # User profile
-    path('profile/', ProfileView.as_view(), name='profile'),
-    
-    # Include router URLs for ViewSets
-    path('', include(router.urls)),
+    path('uploads/', UploadView.as_view(), name='uploads'),
+    path('portal/', include('portal.urls')),
+    path('cms/', include('cms.urls')),
+    path('lost-found/', include('lostfound.urls')),
+    path('rescue/', include('rescue.urls')),
+    path('pets/', include('pets.urls')),
+    path('adopt/', include('pets.adopt_urls')),
+    path('community/', include('community.urls')),
+    path('', include('system.urls')),
 ]

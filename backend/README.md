@@ -2,7 +2,7 @@
 
 ## Features
 - User registration, login (JWT), profile
-- Pet CRUD, user pets, adoption requests, gallery
+- Pet CRUD, user pets, adoption requests
 - Admin endpoints for adoption requests
 - CORS enabled for React frontend
 - SQLite database, media uploads
@@ -39,7 +39,7 @@
 
 ## Testing with Postman
 - Register: `POST /api/register/` { username, password, ... }
-- Login: `POST /api/login/` { username, password } → returns `access` token
+- Login: `POST /api/login/` { username, password } 鈫� returns `access` token
 - Use token in `Authorization` header for all other requests
 - Test file uploads with `multipart/form-data`
 - Admin endpoints require superuser
@@ -53,4 +53,4 @@
 - 500: Check request data format
 
 ## Example Dummy Data
-- Use Django admin or API endpoints to create pets, gallery images, etc.
+- Use Django admin or API endpoints to create pets, etc.

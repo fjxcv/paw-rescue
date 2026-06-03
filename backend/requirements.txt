@@ -4,6 +4,8 @@ djangorestframework-simplejwt
 django-cors-headers
 Pillow
 gunicorn
-psycopg2-binary
-whitenoise
+PyMySQL
 python-dotenv
+whitenoise
+torch
+torchvision

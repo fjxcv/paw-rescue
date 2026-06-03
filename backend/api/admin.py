@@ -1,19 +1,37 @@
 from django.contrib import admin
-from .models import Pet, AdoptionRequest, GalleryImage
+from django.urls import include, path
 
-@admin.register(Pet)
-class PetAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'type', 'breed', 'age', 'owner', 'available')
-    search_fields = ('name', 'type', 'breed', 'owner__username')
-    list_filter = ('type', 'available')
+from accounts.models import UserEmailChangeLog, UserPasswordResetLog, UserProfile, UserVerificationCode
+from cms.models import ArticleFavorite, CmsArticle, CmsCategory
+from community.models import CommentLike, CommunityComment, CommunityPost, PostFavorite, PostLike
+from lostfound.models import LostFoundPost
+from pets.models import AdoptApplication, AdoptAttachment, AdoptOfflineVerify, AdoptQuestionnaire, PetProfile
+from portal.models import PortalCarousel
+from rescue.models import RescueCase, RescueStatusLog
+from system.models import AiInvocationLog, ContentModeration, OperationLog, PlatformConfig
 
-@admin.register(AdoptionRequest)
-class AdoptionRequestAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'pet', 'status', 'created_at')
-    search_fields = ('user__username', 'pet__name')
-    list_filter = ('status',)
-
-@admin.register(GalleryImage)
-class GalleryImageAdmin(admin.ModelAdmin):
-    list_display = ('id', 'uploaded_by', 'uploaded_at')
-    search_fields = ('uploaded_by__username',)
+admin.site.register(UserProfile)
+admin.site.register(UserVerificationCode)
+admin.site.register(UserEmailChangeLog)
+admin.site.register(UserPasswordResetLog)
+admin.site.register(PortalCarousel)
+admin.site.register(CmsCategory)
+admin.site.register(CmsArticle)
+admin.site.register(ArticleFavorite)
+admin.site.register(LostFoundPost)
+admin.site.register(RescueCase)
+admin.site.register(RescueStatusLog)
+admin.site.register(PetProfile)
+admin.site.register(AdoptApplication)
+admin.site.register(AdoptQuestionnaire)
+admin.site.register(AdoptAttachment)
+admin.site.register(AdoptOfflineVerify)
+admin.site.register(CommunityPost)
+admin.site.register(CommunityComment)
+admin.site.register(PostLike)
+admin.site.register(PostFavorite)
+admin.site.register(CommentLike)
+admin.site.register(OperationLog)
+admin.site.register(ContentModeration)
+admin.site.register(PlatformConfig)
+admin.site.register(AiInvocationLog)

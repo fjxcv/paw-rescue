@@ -7,7 +7,7 @@ A full-stack Django + React application for pet adoption with user authenticatio
 - **User Authentication**: JWT-based login/register system
 - **Pet Management**: Add, view, update, and delete pets
 - **Adoption System**: Request to adopt pets with status tracking
-- **Image Upload**: Support for pet photos and gallery
+- **Image Upload**: Support for pet photos and post attachments
 - **Admin Dashboard**: Manage users, pets, and adoption requests
 - **Responsive Design**: Mobile-friendly React frontend
 
@@ -112,16 +112,16 @@ This app is configured for deployment on Railway. See [DEPLOYMENT_GUIDE.md](DEPL
 ## Project Structure
 
 ```
-├── backend/           # Django backend
-│   ├── api/          # Main app with models, views, serializers
-│   ├── backend/      # Project settings
-│   └── manage.py
-├── frontend/         # React frontend
-│   ├── src/
-│   │   ├── api/      # API configuration
-│   │   ├── components/ # React components
-│   │   └── pages/    # Page components
-└── deployment/       # Deployment configuration
+鈹溾攢鈹€ backend/           # Django backend
+鈹�   鈹溾攢鈹€ api/          # Main app with models, views, serializers
+鈹�   鈹溾攢鈹€ backend/      # Project settings
+鈹�   鈹斺攢鈹€ manage.py
+鈹溾攢鈹€ frontend/         # React frontend
+鈹�   鈹溾攢鈹€ src/
+鈹�   鈹�   鈹溾攢鈹€ api/      # API configuration
+鈹�   鈹�   鈹溾攢鈹€ components/ # React components
+鈹�   鈹�   鈹斺攢鈹€ pages/    # Page components
+鈹斺攢鈹€ deployment/       # Deployment configuration
 ```
 
 ## Contributing

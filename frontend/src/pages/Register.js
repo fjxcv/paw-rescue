@@ -1,34 +1,47 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
+import { SITE_NAME } from '../constants/site';
 
 const Register = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
     email: '',
-    password: ''
+    password: '',
+    has_privacy_consent: false,
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: type === 'checkbox' ? checked : value,
     });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.has_privacy_consent) {
+      setError('注册前须同意隐私政策。');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('密码长度至少 8 位。');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await authAPI.register(formData);
-      console.log('Registration successful:', response.data);
-      alert('Welcome to the Pet Pack! 🐾 Please log in.');
+      await authAPI.register(formData);
+      alert(`欢迎加入 ${SITE_NAME}！请登录。`);
       navigate('/login');
     } catch (err) {
       console.error('Registration error details:', err);
@@ -39,23 +52,25 @@ const Register = () => {
 
         if (status === 400) {
           if (data.username) {
-            setError(`🐾 Username issue: ${data.username[0]}`);
+            setError(`用户名问题：${data.username[0]}`);
           } else if (data.email) {
-            setError(`📧 Email issue: ${data.email[0]}`);
+            setError(`邮箱问题：${data.email[0]}`);
           } else if (data.password) {
-            setError(`🔐 Password issue: ${data.password[0]}`);
+            setError(`密码问题：${data.password[0]}`);
+          } else if (data.has_privacy_consent) {
+            setError(`隐私同意：${data.has_privacy_consent[0]}`);
           } else {
-            setError('Invalid registration data. Please check your info.');
+            setError('注册信息无效，请检查后重试。');
           }
         } else if (status === 409) {
-          setError('That pawfile already exists! 🐶 Try a different one.');
+          setError('该用户名已被占用，请换一个。');
         } else {
-          setError(`Registration failed (${status}). Try again soon!`);
+          setError(`注册失败（${status}），请稍后重试。`);
         }
       } else if (err.request) {
-        setError('🐾 Server not responding. Check your internet connection.');
+        setError('服务器无响应，请检查网络连接。');
       } else {
-        setError('Registration failed. Please try again.');
+        setError('注册失败，请重试。');
       }
     } finally {
       setLoading(false);
@@ -67,12 +82,12 @@ const Register = () => {
       <div className="col-md-6 col-lg-4">
         <div className="card shadow-sm border-0" style={{ borderRadius: '20px' }}>
           <div className="card-header text-center bg-light" style={{ borderRadius: '20px 20px 0 0' }}>
-            <h3 className="text-primary">🐾 Join the PetConnect Pack</h3>
+            <h3 className="text-primary">加入 {SITE_NAME}</h3>
           </div>
           <div className="card-body">
             <form onSubmit={handleSubmit}>
               <div className="mb-3">
-                <label htmlFor="username" className="form-label" font='bold'>Pet Lover Name</label>
+                <label htmlFor="username" className="form-label fw-bold">用户名</label>
                 <input
                   type="text"
                   className="form-control"
@@ -81,12 +96,12 @@ const Register = () => {
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  placeholder="e.g., HappyTail123"
+                  placeholder="例如：爱宠小助手"
                 />
               </div>
 
               <div className="mb-3">
-                <label htmlFor="email" className="form-label">Email Address</label>
+                <label htmlFor="email" className="form-label">邮箱地址</label>
                 <input
                   type="email"
                   className="form-control"
@@ -95,12 +110,12 @@ const Register = () => {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  placeholder="yourname@pets.com"
+                  placeholder="yourname@example.com"
                 />
               </div>
 
               <div className="mb-3">
-                <label htmlFor="password" className="form-label">Create Paw-word</label>
+                <label htmlFor="password" className="form-label">设置密码</label>
                 <input
                   type="password"
                   className="form-control"
@@ -109,9 +124,24 @@ const Register = () => {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  minLength="6"
-                  placeholder="At least 6 characters"
+                  minLength={8}
+                  placeholder="至少 8 位字符"
                 />
+              </div>
+
+              <div className="mb-3 form-check">
+                <input
+                  type="checkbox"
+                  className="form-check-input"
+                  id="has_privacy_consent"
+                  name="has_privacy_consent"
+                  checked={formData.has_privacy_consent}
+                  onChange={handleChange}
+                  required
+                />
+                <label className="form-check-label" htmlFor="has_privacy_consent">
+                  我已阅读并同意隐私政策及数据处理条款 *
+                </label>
               </div>
 
               {error && (
@@ -125,14 +155,14 @@ const Register = () => {
                 className="btn btn-success w-100"
                 disabled={loading}
               >
-                {loading ? 'Registering your pawfile...' : '🐾 Create Account'}
+                {loading ? '注册中...' : '创建账号'}
               </button>
             </form>
 
             <div className="text-center mt-3">
               <p>
-                Already part of the pack?{' '}
-                <Link to="/login" className="text-decoration-none">Login here</Link>
+                已有账号？{' '}
+                <Link to="/login" className="text-decoration-none">立即登录</Link>
               </p>
             </div>
           </div>

@@ -1,26 +1,59 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { petsAPI } from '../api/api';
+import { ADOPTION_STATUS } from '../constants/site';
+import AdminManageBar from '../components/AdminManageBar';
+
+const SPECIES_LABELS = {
+  dog: '狗',
+  cat: '猫',
+  bird: '鸟',
+  rabbit: '兔',
+  fish: '鱼',
+  other: '其他',
+};
+
+const GENDER_LABELS = {
+  male: '公',
+  female: '母',
+  unknown: '未知',
+};
+
+const formatAgeMonths = (months) => {
+  if (months == null || months === '') return '未知';
+  const m = Number(months);
+  if (m < 12) return `${m}个月`;
+  const years = Math.floor(m / 12);
+  const rem = m % 12;
+  if (rem === 0) return `${years}岁`;
+  return `${years}岁${rem}个月`;
+};
+
+const ADOPTION_BADGE = {
+  available: 'success',
+  pending: 'warning text-dark',
+  adopted: 'secondary',
+};
 
 const PetList = () => {
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  // Filter states
+
   const [search, setSearch] = useState(searchParams.get('search') || '');
-  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '');
-  const [genderFilter, setGenderFilter] = useState(searchParams.get('gender') || '');
+  const [speciesFilter, setSpeciesFilter] = useState(searchParams.get('species') || '');
 
   useEffect(() => {
     const fetchPets = async () => {
       try {
         setLoading(true);
-        const response = await petsAPI.getAll();
-        setPets(response.data);
+        const params = { adoption_status: 'available' };
+        if (speciesFilter) params.species = speciesFilter;
+        const response = await petsAPI.getAll(params);
+        setPets(Array.isArray(response.data) ? response.data : response.data.results || []);
       } catch (err) {
-        setError('Failed to fetch pets. Please try again later.');
+        setError('加载宠物列表失败，请稍后重试。');
         console.error('Error fetching pets:', err);
       } finally {
         setLoading(false);
@@ -28,62 +61,29 @@ const PetList = () => {
     };
 
     fetchPets();
-  }, []);
+  }, [speciesFilter]);
 
-  // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    if (typeFilter) params.set('type', typeFilter);
-    if (genderFilter) params.set('gender', genderFilter);
+    if (speciesFilter) params.set('species', speciesFilter);
     setSearchParams(params);
-  }, [search, typeFilter, genderFilter, setSearchParams]);
-
-  const handleSearchChange = (e) => {
-    setSearch(e.target.value);
-  };
-
-  const handleTypeChange = (e) => {
-    setTypeFilter(e.target.value);
-  };
-
-  const handleGenderChange = (e) => {
-    setGenderFilter(e.target.value);
-  };
-
-  const removeFilter = (filterType) => {
-    switch (filterType) {
-      case 'search':
-        setSearch('');
-        break;
-      case 'type':
-        setTypeFilter('');
-        break;
-      case 'gender':
-        setGenderFilter('');
-        break;
-      default:
-        break;
-    }
-  };
+  }, [search, speciesFilter, setSearchParams]);
 
   const filteredPets = pets.filter((pet) => {
-    const matchesSearch = !search || (pet.name && pet.name.toLowerCase().includes(search.toLowerCase()));
-    const matchesType = !typeFilter || (pet.type && pet.type.toLowerCase() === typeFilter.toLowerCase());
-    const matchesGender = !genderFilter || (pet.gender && pet.gender.toLowerCase() === genderFilter.toLowerCase());
-    
-    return matchesSearch && matchesType && matchesGender;
+    if (!search) return true;
+    return pet.name && pet.name.toLowerCase().includes(search.toLowerCase());
   });
 
-  const hasActiveFilters = search || typeFilter || genderFilter;
+  const hasActiveFilters = search || speciesFilter;
 
   if (loading) {
     return (
       <div className="text-center py-5">
         <div className="spinner-border text-success" role="status">
-          <span className="visually-hidden">Loading...</span>
+          <span className="visually-hidden">加载中...</span>
         </div>
-        <p className="mt-2">Loading pets...</p>
+        <p className="mt-2">正在加载宠物列表...</p>
       </div>
     );
   }
@@ -98,149 +98,150 @@ const PetList = () => {
 
   return (
     <div className="pet-list-container">
-      {/* Search and Filter Section */}
       <div className="search-filter-section mb-4">
         <div className="container">
           <div className="row g-3">
-            <div className="col-md-4">
+            <div className="col-md-5">
               <div className="search-box">
                 <i className="fas fa-search search-icon"></i>
                 <input
                   type="text"
                   className="form-control search-input"
-                  placeholder="Search pets..."
+                  placeholder="按名称搜索宠物..."
                   value={search}
-                  onChange={handleSearchChange}
+                  onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
             </div>
-            <div className="col-md-3">
+            <div className="col-md-4">
               <select
                 className="form-select filter-select"
-                value={typeFilter}
-                onChange={handleTypeChange}
+                value={speciesFilter}
+                onChange={(e) => setSpeciesFilter(e.target.value)}
               >
-                <option value="">All Types</option>
-                <option value="dog">Dog</option>
-                <option value="cat">Cat</option>
-                <option value="bird">Bird</option>
-                <option value="fish">Fish</option>
-                <option value="rabbit">Rabbit</option>
+                <option value="">全部种类</option>
+                <option value="dog">狗</option>
+                <option value="cat">猫</option>
+                <option value="bird">鸟</option>
+                <option value="rabbit">兔</option>
+                <option value="fish">鱼</option>
+                <option value="other">其他</option>
               </select>
             </div>
             <div className="col-md-3">
-              <select
-                className="form-select filter-select"
-                value={genderFilter}
-                onChange={handleGenderChange}
-              >
-                <option value="">All Genders</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </div>
-            <div className="col-md-2">
               <button
                 className="btn btn-outline-secondary w-100"
                 onClick={() => {
                   setSearch('');
-                  setTypeFilter('');
-                  setGenderFilter('');
+                  setSpeciesFilter('');
                 }}
                 disabled={!hasActiveFilters}
               >
-                Clear All
+                清除筛选
               </button>
             </div>
           </div>
 
-          {/* Active Filters Display */}
           {hasActiveFilters && (
             <div className="active-filters mt-3">
               <div className="d-flex flex-wrap gap-2">
                 {search && (
                   <span className="badge bg-success d-flex align-items-center">
-                    Search: {search}
+                    搜索：{search}
                     <button
+                      type="button"
                       className="btn-close btn-close-white ms-2"
-                      onClick={() => removeFilter('search')}
+                      aria-label="移除搜索条件"
+                      onClick={() => setSearch('')}
                     ></button>
                   </span>
                 )}
-                {typeFilter && (
+                {speciesFilter && (
                   <span className="badge bg-primary d-flex align-items-center">
-                    Type: {typeFilter}
+                    种类：{SPECIES_LABELS[speciesFilter] || speciesFilter}
                     <button
+                      type="button"
                       className="btn-close btn-close-white ms-2"
-                      onClick={() => removeFilter('type')}
+                      aria-label="移除种类筛选"
+                      onClick={() => setSpeciesFilter('')}
                     ></button>
                   </span>
                 )}
-                {genderFilter && (
-                  <span className="badge bg-warning text-dark d-flex align-items-center">
-                    Gender: {genderFilter}
-                    <button
-                      className="btn-close btn-close-white ms-2"
-                      onClick={() => removeFilter('gender')}
-                    ></button>
-                  </span>
-                )}
+                <span className="badge bg-info text-dark">状态：可领养</span>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Results Count */}
       <div className="container mb-4">
         <h5 className="text-muted">
-          {filteredPets.length} pet{filteredPets.length !== 1 ? 's' : ''} found
+          共找到 {filteredPets.length} 只可领养宠物
         </h5>
       </div>
 
-      {/* Pet Cards */}
       <div className="container">
         <div className="row">
           {filteredPets.map((pet) => (
             <div key={pet.id} className="col-md-4 col-lg-3 mb-4">
               <div className="pet-card">
-                <img 
-                  src={pet.photo || 'https://via.placeholder.com/300x200?text=Pet+Photo'} 
-                  className="pet-card-img" 
-                  alt={pet.name || 'Pet'}
+                <img
+                  src={pet.photo_url || 'https://via.placeholder.com/300x200?text=Pet+Photo'}
+                  className="pet-card-img"
+                  alt={pet.name || '宠物'}
                   onError={(e) => {
                     e.target.src = 'https://via.placeholder.com/300x200?text=Pet+Photo';
                   }}
                 />
                 <div className="pet-card-body">
+                  <AdminManageBar
+                    onEdit={() => window.location.assign(`/pets/${pet.id}`)}
+                    onHide={async () => {
+                      await petsAPI.update(pet.id, { is_public: false });
+                      window.location.reload();
+                    }}
+                    onDelete={async () => {
+                      if (!window.confirm('确定删除？')) return;
+                      await petsAPI.delete(pet.id);
+                      window.location.reload();
+                    }}
+                  />
                   <h5 className="pet-card-title">
-                    <i className={`fas fa-${pet.type && pet.type.toLowerCase().includes('dog') ? 'dog' : pet.type && pet.type.toLowerCase().includes('cat') ? 'cat' : 'paw'} me-2 text-success`}></i>
-                    {pet.name || 'Unnamed Pet'}
+                    <i
+                      className={`fas fa-${
+                        pet.species === 'dog' ? 'dog' : pet.species === 'cat' ? 'cat' : 'paw'
+                      } me-2 text-success`}
+                    ></i>
+                    {pet.name || '未命名宠物'}
                   </h5>
                   <p className="pet-card-text">
-                    <strong>Type:</strong> {pet.type || 'Unknown'}<br />
-                    <strong>Breed:</strong> {pet.breed || 'Unknown'}<br />
-                    <strong>Age:</strong> {pet.age || 'Unknown'} years old<br />
-                    <strong>Purpose:</strong> 
-                    <span className={`badge ms-1 bg-${pet.purpose === 'adoption' ? 'success' : pet.purpose === 'sale' ? 'warning text-dark' : 'info'}`}>
-                      {pet.purpose ? pet.purpose.charAt(0).toUpperCase() + pet.purpose.slice(1) : 'Unknown'}
+                    <strong>种类：</strong> {SPECIES_LABELS[pet.species] || pet.species || '未知'}
+                    <br />
+                    <strong>品种：</strong> {pet.breed || '未知'}
+                    <br />
+                    <strong>年龄：</strong> {formatAgeMonths(pet.age_months)}
+                    <br />
+                    <strong>性别：</strong> {GENDER_LABELS[pet.gender] || pet.gender || '未知'}
+                    <br />
+                    <strong>状态：</strong>{' '}
+                    <span className={`badge ms-1 bg-${ADOPTION_BADGE[pet.adoption_status] || 'secondary'}`}>
+                      {ADOPTION_STATUS[pet.adoption_status] || pet.adoption_status || '未知'}
                     </span>
                   </p>
-                  <p className="pet-card-description">{pet.description || 'No description available.'}</p>
+                  <p className="pet-card-description">{pet.description || '暂无描述。'}</p>
                   <Link to={`/pets/${pet.id}`} className="btn btn-success w-100">
-                    View Details
+                    查看详情
                   </Link>
                 </div>
               </div>
             </div>
           ))}
         </div>
-        
+
         {filteredPets.length === 0 && (
           <div className="text-center py-5">
             <i className="fas fa-search fa-3x text-muted mb-3"></i>
-            <p className="text-muted">No pets match your search criteria.</p>
+            <p className="text-muted">没有符合搜索条件的可领养宠物。</p>
           </div>
         )}
       </div>
@@ -251,7 +252,6 @@ const PetList = () => {
           min-height: 100vh;
           padding-top: 2rem;
         }
-        
         .search-filter-section {
           background-color: white;
           border-radius: 15px;
@@ -259,11 +259,7 @@ const PetList = () => {
           box-shadow: 0 4px 15px rgba(0,0,0,0.1);
           margin-bottom: 2rem;
         }
-        
-        .search-box {
-          position: relative;
-        }
-        
+        .search-box { position: relative; }
         .search-icon {
           position: absolute;
           left: 15px;
@@ -272,36 +268,30 @@ const PetList = () => {
           color: #666;
           z-index: 10;
         }
-        
         .search-input {
           padding-left: 45px;
           border-radius: 25px;
           border: 2px solid #e9ecef;
           transition: all 0.3s ease;
         }
-        
         .search-input:focus {
           border-color: #00C897;
           box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.25);
         }
-        
         .filter-select {
           border-radius: 25px;
           border: 2px solid #e9ecef;
           transition: all 0.3s ease;
         }
-        
         .filter-select:focus {
           border-color: #00C897;
           box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.25);
         }
-        
         .active-filters {
           padding: 1rem;
           background-color: #f8f9fa;
           border-radius: 10px;
         }
-        
         .pet-card {
           background: white;
           border-radius: 15px;
@@ -310,47 +300,30 @@ const PetList = () => {
           transition: all 0.3s ease;
           height: 100%;
         }
-        
         .pet-card:hover {
           transform: translateY(-5px);
           box-shadow: 0 8px 25px rgba(0,0,0,0.15);
         }
-        
         .pet-card-img {
           width: 100%;
           height: 200px;
           object-fit: cover;
         }
-        
-        .pet-card-body {
-          padding: 1.5rem;
-        }
-        
-        .pet-card-title {
-          color: #333;
-          margin-bottom: 1rem;
-        }
-        
-        .pet-card-text {
-          color: #666;
-          font-size: 0.9rem;
-          margin-bottom: 1rem;
-        }
-        
+        .pet-card-body { padding: 1.5rem; }
+        .pet-card-title { color: #333; margin-bottom: 1rem; }
+        .pet-card-text { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
         .pet-card-description {
           color: #888;
           font-size: 0.85rem;
           margin-bottom: 1.5rem;
           line-height: 1.4;
         }
-        
         .btn-success {
           background-color: #00C897;
           border-color: #00C897;
           border-radius: 25px;
           transition: all 0.3s ease;
         }
-        
         .btn-success:hover {
           background-color: #00B386;
           border-color: #00B386;
@@ -361,4 +334,4 @@ const PetList = () => {
   );
 };
 
-export default PetList; 
+export default PetList;

@@ -1,12 +1,12 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 const ProtectedRoute = ({ children }) => {
+  const location = useLocation();
   const isAuthenticated = localStorage.getItem('token');
-  
+
   if (!isAuthenticated) {
-    // User is not authenticated, redirect to login page
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
   
   // User is authenticated, render the protected component
