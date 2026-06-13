@@ -2,6 +2,7 @@ import api from './index';
 
 export const adoptAPI = {
   getAll: () => api.get('/adopt/applications/'),
+  getById: (id) => api.get(`/adopt/applications/${id}/`),
   create: (data) => api.post('/adopt/applications/', data),
   getMy: () => api.get('/adopt/applications/my/'),
   submitQuestionnaire: (id, answers_json) => api.post(`/adopt/applications/${id}/questionnaire/`, { answers_json }),

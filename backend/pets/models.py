@@ -11,6 +11,12 @@ class PetProfile(models.Model):
         ('adopted', 'Adopted'),
     ]
 
+    SIZE_CATEGORY_CHOICES = [
+        ('small', '小型'),
+        ('medium', '中型'),
+        ('large', '大型'),
+    ]
+
     rescue_case = models.ForeignKey(
         RescueCase, on_delete=models.SET_NULL, null=True, blank=True, related_name='pets'
     )
@@ -19,6 +25,7 @@ class PetProfile(models.Model):
     breed = models.CharField(max_length=100, blank=True, null=True)
     age_months = models.IntegerField(blank=True, null=True)
     gender = models.CharField(max_length=10, blank=True, null=True)
+    size_category = models.CharField(max_length=10, choices=SIZE_CATEGORY_CHOICES, blank=True, null=True)
     health_status = models.CharField(max_length=100, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     photo_url = models.CharField(max_length=500, blank=True, null=True)

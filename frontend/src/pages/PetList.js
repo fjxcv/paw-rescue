@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { petsAPI } from '../api/api';
 import { ADOPTION_STATUS } from '../constants/site';
 import AdminManageBar from '../components/AdminManageBar';
+
+// ===== 常量定义 =====
 
 const SPECIES_LABELS = {
   dog: '狗',
@@ -17,6 +19,29 @@ const GENDER_LABELS = {
   male: '公',
   female: '母',
   unknown: '未知',
+};
+
+const AGE_RANGE_OPTIONS = [
+  { value: '', label: '不限年龄' },
+  { value: '0-6', label: '0-6个月（幼崽）' },
+  { value: '6-12', label: '6-12个月（青少年）' },
+  { value: '12-36', label: '1-3岁（成年）' },
+  { value: '36-999', label: '3岁以上（中老年）' },
+];
+
+const SIZE_LABELS = {
+  small: '小型',
+  medium: '中型',
+  large: '大型',
+};
+
+// 从详细地址中提取市级名称，如"成都市锦江区东大街"→"成都"
+const extractCity = (address) => {
+  if (!address) return null;
+  const idx = address.indexOf('市');
+  if (idx !== -1) return address.substring(0, idx + 1);
+  // 直辖市或没有"市"字的：取前4个字符
+  return address.length > 4 ? address.substring(0, 4) : address;
 };
 
 const formatAgeMonths = (months) => {
@@ -35,21 +60,59 @@ const ADOPTION_BADGE = {
   adopted: 'secondary',
 };
 
+// ===== 组件 =====
+
 const PetList = () => {
+  const navigate = useNavigate();
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // 筛选条件（实际生效的，会触发 API 请求）
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [speciesFilter, setSpeciesFilter] = useState(searchParams.get('species') || '');
+  const [genderFilter, setGenderFilter] = useState(searchParams.get('gender') || '');
+  const [ageRangeFilter, setAgeRangeFilter] = useState(searchParams.get('age_range') || '');
+  const [locationFilter, setLocationFilter] = useState(searchParams.get('location') || '');
 
+  // 输入框暂存值（未确认/未回车时不触发请求）
+  const [searchText, setSearchText] = useState(searchParams.get('search') || '');
+  const [locationText, setLocationText] = useState(searchParams.get('location') || '');
+
+  // ===== 构建 API 参数 =====
+  const buildApiParams = useCallback(() => {
+    const params = { adoption_status: 'available' };
+    if (search) params.search = search;
+    if (speciesFilter) params.species = speciesFilter;
+    if (genderFilter) params.gender = genderFilter;
+    if (locationFilter) params.location = locationFilter;
+    if (ageRangeFilter) {
+      const [min, max] = ageRangeFilter.split('-');
+      if (min) params.age_min = min;
+      if (max && max !== '999') params.age_max = max;
+    }
+    return params;
+  }, [search, speciesFilter, genderFilter, ageRangeFilter, locationFilter]);
+
+  // ===== 同步筛选条件到 URL =====
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (speciesFilter) params.set('species', speciesFilter);
+    if (genderFilter) params.set('gender', genderFilter);
+    if (ageRangeFilter) params.set('age_range', ageRangeFilter);
+    if (locationFilter) params.set('location', locationFilter);
+    setSearchParams(params, { replace: true });
+  }, [search, speciesFilter, genderFilter, ageRangeFilter, locationFilter, setSearchParams]);
+
+  // ===== 请求宠物列表（除搜索外，其他筛选变化直接触发）=====
   useEffect(() => {
     const fetchPets = async () => {
       try {
         setLoading(true);
-        const params = { adoption_status: 'available' };
-        if (speciesFilter) params.species = speciesFilter;
+        setError(null);
+        const params = buildApiParams();
         const response = await petsAPI.getAll(params);
         setPets(Array.isArray(response.data) ? response.data : response.data.results || []);
       } catch (err) {
@@ -61,22 +124,76 @@ const PetList = () => {
     };
 
     fetchPets();
-  }, [speciesFilter]);
+  }, [speciesFilter, genderFilter, ageRangeFilter, locationFilter, search, buildApiParams]);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    if (speciesFilter) params.set('species', speciesFilter);
-    setSearchParams(params);
-  }, [search, speciesFilter, setSearchParams]);
+  // ===== 搜索确认按钮 =====
+  const handleSearchConfirm = () => {
+    setSearch(searchText.trim());
+  };
 
-  const filteredPets = pets.filter((pet) => {
-    if (!search) return true;
-    return pet.name && pet.name.toLowerCase().includes(search.toLowerCase());
-  });
+  // 搜索框回车也触发搜索
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setSearch(searchText.trim());
+    }
+  };
 
-  const hasActiveFilters = search || speciesFilter;
+  // ===== 地区筛选：仅按回车触发 =====
+  const handleLocationKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      setLocationFilter(locationText.trim());
+    }
+  };
 
+  // ===== 一键重置 =====
+  const handleClearAll = () => {
+    setSearchText('');
+    setSearch('');
+    setSpeciesFilter('');
+    setGenderFilter('');
+    setAgeRangeFilter('');
+    setLocationText('');
+    setLocationFilter('');
+  };
+
+  const hasActiveFilters = search || speciesFilter || genderFilter || ageRangeFilter || locationFilter;
+
+  // ===== 活跃筛选标签 =====
+  const activeFilterBadges = [];
+  if (search) {
+    activeFilterBadges.push({ key: 'search', label: `名称：${search}`, onRemove: () => { setSearch(''); setSearchText(''); } });
+  }
+  if (speciesFilter) {
+    activeFilterBadges.push({
+      key: 'species',
+      label: `种类：${SPECIES_LABELS[speciesFilter] || speciesFilter}`,
+      onRemove: () => setSpeciesFilter(''),
+    });
+  }
+  if (genderFilter) {
+    activeFilterBadges.push({
+      key: 'gender',
+      label: `性别：${GENDER_LABELS[genderFilter] || genderFilter}`,
+      onRemove: () => setGenderFilter(''),
+    });
+  }
+  if (ageRangeFilter) {
+    const option = AGE_RANGE_OPTIONS.find((o) => o.value === ageRangeFilter);
+    activeFilterBadges.push({
+      key: 'age',
+      label: `年龄：${option ? option.label : ageRangeFilter}`,
+      onRemove: () => setAgeRangeFilter(''),
+    });
+  }
+  if (locationFilter) {
+    activeFilterBadges.push({
+      key: 'location',
+      label: `地区：${locationFilter}`,
+      onRemove: () => { setLocationFilter(''); setLocationText(''); },
+    });
+  }
+
+  // ===== 加载状态 =====
   if (loading) {
     return (
       <div className="text-center py-5">
@@ -98,22 +215,37 @@ const PetList = () => {
 
   return (
     <div className="pet-list-container">
+      {/* ===== 筛选搜索区域 ===== */}
       <div className="search-filter-section mb-4">
         <div className="container">
-          <div className="row g-3">
-            <div className="col-md-5">
+          {/* 第一行：搜索框 + 确认按钮 */}
+          <div className="row g-3 mb-3">
+            <div className="col-md-9">
               <div className="search-box">
                 <i className="fas fa-search search-icon"></i>
                 <input
                   type="text"
                   className="form-control search-input"
-                  placeholder="按名称搜索宠物..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="按宠物名称搜索..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                 />
               </div>
             </div>
-            <div className="col-md-4">
+            <div className="col-md-3">
+              <button
+                className="btn btn-success w-100 search-confirm-btn"
+                onClick={handleSearchConfirm}
+              >
+                <i className="fas fa-search me-1"></i>搜索
+              </button>
+            </div>
+          </div>
+
+          {/* 第二行：筛选条件 + 一键重置（同一行） */}
+          <div className="row g-2 align-items-center">
+            <div className="col-4 col-md-2">
               <select
                 className="form-select filter-select"
                 value={speciesFilter}
@@ -128,84 +260,135 @@ const PetList = () => {
                 <option value="other">其他</option>
               </select>
             </div>
-            <div className="col-md-3">
+            <div className="col-4 col-md-2">
+              <select
+                className="form-select filter-select"
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value)}
+              >
+                <option value="">全部性别</option>
+                <option value="male">公</option>
+                <option value="female">母</option>
+                <option value="unknown">未知</option>
+              </select>
+            </div>
+            <div className="col-4 col-md-2">
+              <select
+                className="form-select filter-select"
+                value={ageRangeFilter}
+                onChange={(e) => setAgeRangeFilter(e.target.value)}
+              >
+                <option value="">不限年龄</option>
+                {AGE_RANGE_OPTIONS.filter((o) => o.value).map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-6 col-md-3">
+              <div className="location-box">
+                <i className="fas fa-map-marker-alt location-icon"></i>
+                <input
+                  type="text"
+                  className="form-control location-input"
+                  placeholder="按地区筛选（回车确认）..."
+                  value={locationText}
+                  onChange={(e) => setLocationText(e.target.value)}
+                  onKeyDown={handleLocationKeyDown}
+                />
+              </div>
+            </div>
+            <div className="col-6 col-md-3">
               <button
-                className="btn btn-outline-secondary w-100"
-                onClick={() => {
-                  setSearch('');
-                  setSpeciesFilter('');
-                }}
+                className="btn btn-outline-secondary w-100 reset-btn"
+                onClick={handleClearAll}
                 disabled={!hasActiveFilters}
               >
-                清除筛选
+                <i className="fas fa-undo me-1"></i>一键重置
               </button>
             </div>
           </div>
 
-          {hasActiveFilters && (
+          {/* 活跃筛选条件标签 */}
+          {activeFilterBadges.length > 0 && (
             <div className="active-filters mt-3">
-              <div className="d-flex flex-wrap gap-2">
-                {search && (
-                  <span className="badge bg-success d-flex align-items-center">
-                    搜索：{search}
+              <div className="d-flex flex-wrap align-items-center gap-2">
+                <small className="text-muted me-1">当前筛选：</small>
+                {activeFilterBadges.map((badge) => (
+                  <span key={badge.key} className="badge bg-success d-flex align-items-center filter-badge">
+                    {badge.label}
                     <button
                       type="button"
                       className="btn-close btn-close-white ms-2"
-                      aria-label="移除搜索条件"
-                      onClick={() => setSearch('')}
+                      aria-label={`移除${badge.label}`}
+                      onClick={badge.onRemove}
                     ></button>
                   </span>
-                )}
-                {speciesFilter && (
-                  <span className="badge bg-primary d-flex align-items-center">
-                    种类：{SPECIES_LABELS[speciesFilter] || speciesFilter}
-                    <button
-                      type="button"
-                      className="btn-close btn-close-white ms-2"
-                      aria-label="移除种类筛选"
-                      onClick={() => setSpeciesFilter('')}
-                    ></button>
-                  </span>
-                )}
-                <span className="badge bg-info text-dark">状态：可领养</span>
+                ))}
+                <span className="badge bg-info text-dark">可领养</span>
               </div>
             </div>
           )}
         </div>
       </div>
 
+      {/* ===== 结果统计 + 我的申请按钮 ===== */}
       <div className="container mb-4">
-        <h5 className="text-muted">
-          共找到 {filteredPets.length} 只可领养宠物
-        </h5>
+        <div className="d-flex justify-content-between align-items-center">
+          <h5 className="text-muted mb-0">
+            共找到 <strong className="text-success">{pets.length}</strong> 只可领养宠物
+          </h5>
+          <div className="d-flex align-items-center gap-2">
+            {hasActiveFilters && (
+              <small className="text-muted">
+                已应用 {activeFilterBadges.length} 个筛选条件
+              </small>
+            )}
+            <Link to="/my-applications" className="btn btn-outline-success btn-sm my-applications-btn">
+              <i className="fas fa-clipboard-list me-1"></i>我的申请与核验
+            </Link>
+          </div>
+        </div>
       </div>
 
+      {/* ===== 宠物卡片列表 ===== */}
       <div className="container">
         <div className="row">
-          {filteredPets.map((pet) => (
+          {pets.map((pet) => (
             <div key={pet.id} className="col-md-4 col-lg-3 mb-4">
-              <div className="pet-card">
-                <img
-                  src={pet.photo_url || 'https://via.placeholder.com/300x200?text=Pet+Photo'}
-                  className="pet-card-img"
-                  alt={pet.name || '宠物'}
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/300x200?text=Pet+Photo';
-                  }}
-                />
-                <div className="pet-card-body">
-                  <AdminManageBar
-                    onEdit={() => window.location.assign(`/pets/${pet.id}`)}
-                    onHide={async () => {
-                      await petsAPI.update(pet.id, { is_public: false });
-                      window.location.reload();
-                    }}
-                    onDelete={async () => {
-                      if (!window.confirm('确定删除？')) return;
-                      await petsAPI.delete(pet.id);
-                      window.location.reload();
+              <div className="pet-card" onClick={() => navigate(`/pets/${pet.id}`)} style={{ cursor: 'pointer' }}>
+                {/* 宠物照片 */}
+                <div className="pet-card-img-wrapper">
+                  <img
+                    src={pet.photo_url || 'https://via.placeholder.com/300x200?text=Pet+Photo'}
+                    className="pet-card-img"
+                    alt={pet.name || '宠物'}
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/300x200?text=Pet+Photo';
                     }}
                   />
+                  <span className={`pet-status-badge badge bg-${ADOPTION_BADGE[pet.adoption_status] || 'secondary'}`}>
+                    {ADOPTION_STATUS[pet.adoption_status] || '未知'}
+                  </span>
+                </div>
+
+                <div className="pet-card-body">
+                  {/* 管理员操作栏 — 阻止冒泡防止触发卡片点击跳转 */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <AdminManageBar
+                      onEdit={() => window.location.assign(`/pets/${pet.id}`)}
+                      onHide={async () => {
+                        await petsAPI.update(pet.id, { is_public: false });
+                        window.location.reload();
+                      }}
+                      onDelete={async () => {
+                        if (!window.confirm('确定删除？')) return;
+                        await petsAPI.delete(pet.id);
+                        window.location.reload();
+                      }}
+                    />
+                  </div>
+
+                  {/* 宠物名称 + 种类图标 */}
                   <h5 className="pet-card-title">
                     <i
                       className={`fas fa-${
@@ -214,120 +397,256 @@ const PetList = () => {
                     ></i>
                     {pet.name || '未命名宠物'}
                   </h5>
-                  <p className="pet-card-text">
-                    <strong>种类：</strong> {SPECIES_LABELS[pet.species] || pet.species || '未知'}
-                    <br />
-                    <strong>品种：</strong> {pet.breed || '未知'}
-                    <br />
-                    <strong>年龄：</strong> {formatAgeMonths(pet.age_months)}
-                    <br />
-                    <strong>性别：</strong> {GENDER_LABELS[pet.gender] || pet.gender || '未知'}
-                    <br />
-                    <strong>状态：</strong>{' '}
-                    <span className={`badge ms-1 bg-${ADOPTION_BADGE[pet.adoption_status] || 'secondary'}`}>
-                      {ADOPTION_STATUS[pet.adoption_status] || pet.adoption_status || '未知'}
-                    </span>
-                  </p>
-                  <p className="pet-card-description">{pet.description || '暂无描述。'}</p>
-                  <Link to={`/pets/${pet.id}`} className="btn btn-success w-100">
-                    查看详情
-                  </Link>
+
+                  {/* 基本信息（无品种字段） */}
+                  <div className="pet-card-info">
+                    <div className="info-row">
+                      <span className="info-label"><i className="fas fa-tag me-1"></i>种类</span>
+                      <span className="info-value">{SPECIES_LABELS[pet.species] || pet.species || '未知'}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label"><i className="fas fa-venus-mars me-1"></i>性别</span>
+                      <span className="info-value">{GENDER_LABELS[pet.gender] || pet.gender || '未知'}</span>
+                    </div>
+                    <div className="info-row">
+                      <span className="info-label"><i className="fas fa-calendar-alt me-1"></i>年龄</span>
+                      <span className="info-value">{formatAgeMonths(pet.age_months)}</span>
+                    </div>
+                    {/* 体型 */}
+                    {(pet.size_category_display || pet.rescue_case_appearance) && (
+                      <div className="info-row">
+                        <span className="info-label"><i className="fas fa-weight me-1"></i>体型</span>
+                        <span className="info-value">
+                          {pet.size_category_display || pet.rescue_case_appearance}
+                        </span>
+                      </div>
+                    )}
+                    {/* 所在地区（截断到市级） */}
+                    {pet.rescue_case_address && (
+                      <div className="info-row">
+                        <span className="info-label"><i className="fas fa-map-marker-alt me-1"></i>地区</span>
+                        <span className="info-value" title={pet.rescue_case_address}>
+                          {extractCity(pet.rescue_case_address)}
+                        </span>
+                      </div>
+                    )}
+                    {/* 健康状况 */}
+                    {pet.health_status && (
+                      <div className="info-row">
+                        <span className="info-label"><i className="fas fa-heartbeat me-1"></i>健康</span>
+                        <span className="info-value">{pet.health_status}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
-        </div>
 
-        {filteredPets.length === 0 && (
-          <div className="text-center py-5">
-            <i className="fas fa-search fa-3x text-muted mb-3"></i>
-            <p className="text-muted">没有符合搜索条件的可领养宠物。</p>
-          </div>
-        )}
+          {/* 空状态 */}
+          {pets.length === 0 && (
+            <div className="text-center py-5">
+              <i className="fas fa-search fa-3x text-muted mb-3"></i>
+              <p className="text-muted">没有符合筛选条件的可领养宠物。</p>
+              {hasActiveFilters && (
+                <button className="btn btn-outline-success mt-2" onClick={handleClearAll}>
+                  <i className="fas fa-undo me-1"></i>清除全部筛选条件
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* ===== 样式 ===== */}
       <style>{`
         .pet-list-container {
           background-color: #FAFAFA;
           min-height: 100vh;
           padding-top: 2rem;
         }
+
+        /* 筛选区域 */
         .search-filter-section {
-          background-color: white;
-          border-radius: 15px;
-          padding: 2rem;
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-          margin-bottom: 2rem;
+          background: white;
+          border-radius: 16px;
+          padding: 1.5rem 2rem;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
         }
+
+        /* 搜索框 */
         .search-box { position: relative; }
         .search-icon {
           position: absolute;
-          left: 15px;
+          left: 16px;
           top: 50%;
           transform: translateY(-50%);
-          color: #666;
+          color: #999;
           z-index: 10;
+          font-size: 1rem;
         }
         .search-input {
-          padding-left: 45px;
+          padding-left: 42px;
           border-radius: 25px;
           border: 2px solid #e9ecef;
           transition: all 0.3s ease;
+          height: 44px;
         }
         .search-input:focus {
           border-color: #00C897;
-          box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.25);
+          box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.2);
         }
+        .search-confirm-btn {
+          border-radius: 25px;
+          height: 44px;
+          transition: all 0.3s ease;
+        }
+
+        /* 地区输入框 */
+        .location-box { position: relative; }
+        .location-icon {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #999;
+          z-index: 10;
+          font-size: 0.9rem;
+        }
+        .location-input {
+          padding-left: 36px;
+          border-radius: 25px;
+          border: 2px solid #e9ecef;
+          transition: all 0.3s ease;
+          height: 44px;
+        }
+        .location-input:focus {
+          border-color: #00C897;
+          box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.2);
+        }
+
+        /* 筛选下拉框 */
         .filter-select {
           border-radius: 25px;
           border: 2px solid #e9ecef;
           transition: all 0.3s ease;
+          height: 44px;
+          cursor: pointer;
+          font-size: 0.9rem;
         }
         .filter-select:focus {
           border-color: #00C897;
-          box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.25);
+          box-shadow: 0 0 0 0.2rem rgba(0, 200, 151, 0.2);
         }
+
+        /* 重置按钮 */
+        .reset-btn {
+          border-radius: 25px;
+          height: 44px;
+          transition: all 0.3s ease;
+          font-size: 0.9rem;
+        }
+        .reset-btn:hover:not(:disabled) {
+          background-color: #dc3545;
+          border-color: #dc3545;
+          color: white;
+        }
+
+        /* 活跃筛选条件 */
         .active-filters {
-          padding: 1rem;
+          padding: 0.75rem 1rem;
           background-color: #f8f9fa;
-          border-radius: 10px;
+          border-radius: 12px;
+          border: 1px dashed #dee2e6;
         }
+        .filter-badge {
+          font-size: 0.82rem;
+          padding: 0.4em 0.7em;
+          border-radius: 20px;
+        }
+
+        /* 宠物卡片 */
         .pet-card {
           background: white;
-          border-radius: 15px;
+          border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
           transition: all 0.3s ease;
           height: 100%;
+          display: flex;
+          flex-direction: column;
         }
         .pet-card:hover {
           transform: translateY(-5px);
-          box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+          box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+          border: 2px solid #00C897;
+        }
+
+        /* 卡片图片 */
+        .pet-card-img-wrapper {
+          position: relative;
         }
         .pet-card-img {
           width: 100%;
           height: 200px;
           object-fit: cover;
         }
-        .pet-card-body { padding: 1.5rem; }
-        .pet-card-title { color: #333; margin-bottom: 1rem; }
-        .pet-card-text { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
-        .pet-card-description {
-          color: #888;
+        .pet-status-badge {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          font-size: 0.75rem;
+          padding: 0.35em 0.7em;
+          border-radius: 20px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* 卡片内容 */
+        .pet-card-body {
+          padding: 1.25rem;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+        .pet-card-title {
+          color: #333;
+          margin-bottom: 0.75rem;
+          font-size: 1.15rem;
+          font-weight: 600;
+        }
+
+        /* 信息行 */
+        .pet-card-info {
+          margin-bottom: 0.5rem;
+        }
+        .info-row {
+          display: flex;
+          align-items: flex-start;
           font-size: 0.85rem;
-          margin-bottom: 1.5rem;
-          line-height: 1.4;
+          margin-bottom: 0.3rem;
+          line-height: 1.5;
         }
-        .btn-success {
-          background-color: #00C897;
-          border-color: #00C897;
+        .info-label {
+          color: #999;
+          min-width: 52px;
+          flex-shrink: 0;
+        }
+        .info-value {
+          color: #555;
+          flex: 1;
+        }
+
+        /* 我的申请按钮 */
+        .my-applications-btn {
           border-radius: 25px;
+          border: 2px solid #00C897;
+          color: #00C897;
           transition: all 0.3s ease;
+          white-space: nowrap;
         }
-        .btn-success:hover {
-          background-color: #00B386;
-          border-color: #00B386;
-          transform: translateY(-2px);
+        .my-applications-btn:hover {
+          background-color: #00C897;
+          color: white;
         }
       `}</style>
     </div>

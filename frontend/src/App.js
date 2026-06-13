@@ -19,7 +19,10 @@ import Login from './pages/Login';
 import LostFoundDetail from './pages/LostFoundDetail';
 import LostFoundList from './pages/LostFoundList';
 import LostFoundPublish from './pages/LostFoundPublish';
+import ApplicationDetail from './pages/ApplicationDetail';
+import MyApplications from './pages/MyApplications';
 import MyPets from './pages/MyPets';
+import AdoptApplication from './pages/AdoptApplication';
 import PetDetail from './pages/PetDetail';
 import PetList from './pages/PetList';
 import Register from './pages/Register';
@@ -45,6 +48,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/pets" element={<PetList />} />
               <Route path="/pets/:id" element={<PetDetail />} />
+              <Route path="/adopt/:petId" element={<ProtectedRoute><AdoptApplication /></ProtectedRoute>} />
               <Route path="/cms" element={<CmsList />} />
               <Route path="/cms/:id" element={<CmsDetail />} />
               <Route path="/lost-found" element={<LostFoundList />} />
@@ -63,6 +67,8 @@ function App() {
               <Route path="/account" element={<ProtectedRoute><AccountCenter /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
               <Route path="/my-pets" element={<ProtectedRoute><MyPets /></ProtectedRoute>} />
+              <Route path="/my-applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
+              <Route path="/my-applications/:id" element={<ProtectedRoute><ApplicationDetail /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/add-pet" element={<ProtectedRoute><AddPet /></ProtectedRoute>} />
