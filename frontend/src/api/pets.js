@@ -20,8 +20,13 @@ export const petsAPI = {
 };
 
 export const rescueAPI = {
-  getAll: () => api.get('/rescue/cases/'),
+  getAll: (params) => api.get('/rescue/cases/', { params }),
   getById: (id) => api.get(`/rescue/cases/${id}/`),
+  getMyCases: () => api.get('/rescue/cases/', { params: { my: 'true', exclude_status: 'awaiting_adoption' } }),
+  getHelpedCases: (params) => api.get('/rescue/cases/', { params: { helped: 'true', ...params } }),
   create: (data) => api.post('/rescue/cases/', data),
+  help: (id) => api.post(`/rescue/cases/${id}/help/`),
   updateStatus: (id, data) => api.patch(`/rescue/cases/${id}/status/`, data),
+  getStageRecords: (id) => api.get(`/rescue/cases/${id}/stage-records/`),
+  addStageRecord: (id, data) => api.post(`/rescue/cases/${id}/stage-records/`, data),
 };

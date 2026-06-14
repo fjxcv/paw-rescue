@@ -26,6 +26,11 @@ import AdoptApplication from './pages/AdoptApplication';
 import PetDetail from './pages/PetDetail';
 import PetList from './pages/PetList';
 import Register from './pages/Register';
+import MyRescues from './pages/MyRescues';
+import UpdateRescueStatus from './pages/UpdateRescueStatus';
+import StageRecord from './pages/StageRecord';
+import RescueSearch from './pages/RescueSearch';
+import RescueDetail from './pages/RescueDetail';
 import RescueList from './pages/RescueList';
 import RescueReport from './pages/RescueReport';
 import AccountCenter from './pages/AccountCenter';
@@ -58,8 +63,13 @@ function App() {
               <Route path="/community/publish" element={<ProtectedRoute><CommunityPublish /></ProtectedRoute>} />
               <Route path="/community/:id/edit" element={<ProtectedRoute><CommunityPostEdit /></ProtectedRoute>} />
               <Route path="/community/:id" element={<CommunityPostDetail />} />
-              <Route path="/rescue" element={<RescueList />} />
+              <Route path="/rescue" element={<ProtectedRoute><RescueList /></ProtectedRoute>} />
               <Route path="/rescue/report" element={<ProtectedRoute><RescueReport /></ProtectedRoute>} />
+              <Route path="/rescue/search" element={<ProtectedRoute><RescueSearch /></ProtectedRoute>} />
+              <Route path="/rescue/:id" element={<ProtectedRoute><RescueDetail /></ProtectedRoute>} />
+              <Route path="/my-rescues" element={<ProtectedRoute><MyRescues /></ProtectedRoute>} />
+              <Route path="/my-rescues/:id/update-status" element={<ProtectedRoute><UpdateRescueStatus /></ProtectedRoute>} />
+              <Route path="/my-rescues/:id/stage-record" element={<ProtectedRoute><StageRecord /></ProtectedRoute>} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
