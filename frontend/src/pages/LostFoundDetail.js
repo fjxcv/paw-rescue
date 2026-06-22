@@ -1,21 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { lostFoundAPI } from '../api/api';
-import { LOST_FOUND_TYPE } from '../constants/site';
+import { authAPI, lostFoundAPI } from '../api/api';
+import { LOST_FOUND_STATUS, LOST_FOUND_TYPE } from '../constants/site';
 
 const LostFoundDetail = () => {
   const { id } = useParams();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const detailMapRef = useRef(null);
 
   useEffect(() => {
     const fetchPost = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await lostFoundAPI.getById(id);
-        setPost(response.data);
+        const [postRes, profileRes] = await Promise.all([
+          lostFoundAPI.getById(id),
+          authAPI.getProfile().catch(() => ({ data: null })),
+        ]);
+        setPost(postRes.data);
+        setCurrentUserId(profileRes.data?.id || null);
       } catch (err) {
         setError('加载详情失败，请稍后重试。');
         console.error(err);
@@ -25,6 +31,79 @@ const LostFoundDetail = () => {
     };
     fetchPost();
   }, [id]);
+
+  const handleMarkFound = async () => {
+    try {
+      await lostFoundAPI.update(id, { status: 'found' });
+      setPost((prev) => ({ ...prev, status: 'found' }));
+    } catch (err) {
+      alert('操作失败');
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!window.confirm('确定要撤销这条发布吗？')) return;
+    try {
+      await lostFoundAPI.update(id, { status: 'cancelled' });
+      setPost((prev) => ({ ...prev, status: 'cancelled' }));
+    } catch (err) {
+      alert('操作失败');
+    }
+  };
+
+  const canManage = currentUserId && post?.publisher?.id === currentUserId;
+
+  // 详情页地图
+  useEffect(() => {
+    const mapContainer = detailMapRef.current;
+    if (!mapContainer || post?.latitude == null || post?.longitude == null) return;
+
+    const lat = parseFloat(post.latitude);
+    const lng = parseFloat(post.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    let mapInstance = null;
+    let scriptElement = null;
+    let linkElement = null;
+
+    const initMap = () => {
+      if (!mapContainer || mapContainer._leaflet_map) return;
+      try {
+        const L = window.L;
+        mapInstance = L.map(mapContainer).setView([lat, lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap',
+        }).addTo(mapInstance);
+        L.marker([lat, lng]).addTo(mapInstance);
+      } catch (e) {
+        console.error('Map init error:', e);
+      }
+    };
+
+    if (window.L) {
+      initMap();
+    } else {
+      // 动态加载 Leaflet
+      linkElement = document.createElement('link');
+      linkElement.rel = 'stylesheet';
+      linkElement.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(linkElement);
+
+      scriptElement = document.createElement('script');
+      scriptElement.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      scriptElement.onload = initMap;
+      scriptElement.onerror = () => console.error('Leaflet script load failed');
+      document.body.appendChild(scriptElement);
+    }
+
+    return () => {
+      if (mapInstance) {
+        mapInstance.remove();
+        mapInstance = null;
+      }
+    };
+  }, [post]);
 
   if (loading) {
     return (
@@ -60,7 +139,9 @@ const LostFoundDetail = () => {
             <span className={`badge ${post.post_type === 'lost' ? 'bg-danger' : 'bg-info'} me-2`}>
               {LOST_FOUND_TYPE[post.post_type] || post.post_type}
             </span>
-            <span className="badge bg-secondary">{post.status}</span>
+            <span className={`badge ${post.status === 'searching' ? 'bg-warning text-dark' : post.status === 'found' ? 'bg-success' : 'bg-secondary'}`}>
+              {LOST_FOUND_STATUS[post.status] || post.status}
+            </span>
           </div>
 
           <h2 className="mb-3">{post.pet_species}</h2>
@@ -89,14 +170,10 @@ const LostFoundDetail = () => {
               <h6><i className="fas fa-map-marker-alt me-2 text-success"></i>位置</h6>
               <p className="mb-1">{post.address_text || '未填写地址'}</p>
               {post.latitude != null && post.longitude != null && (
-                <a
-                  href={`https://www.openstreetmap.org/?mlat=${post.latitude}&mlon=${post.longitude}#map=16/${post.latitude}/${post.longitude}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="small"
-                >
-                  在地图中查看
-                </a>
+                <div
+                  ref={detailMapRef}
+                  style={{ width: '100%', height: 200, borderRadius: 8, border: '1px solid #ddd', marginTop: 8 }}
+                />
               )}
             </div>
             {Number(post.reward_amount) > 0 && (
@@ -108,7 +185,7 @@ const LostFoundDetail = () => {
             {post.contact_phone && (
               <div className="col-md-6 mb-3">
                 <h6><i className="fas fa-phone me-2"></i>联系电话</h6>
-                <p>{post.contact_phone}</p>
+                <p>{post.contact_phone_display || post.contact_phone}</p>
               </div>
             )}
             {post.publisher && (
@@ -125,10 +202,20 @@ const LostFoundDetail = () => {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 d-flex gap-2 flex-wrap">
         <Link to="/lost-found" className="btn btn-outline-secondary">
           <i className="fas fa-arrow-left me-1"></i>返回列表
         </Link>
+        {canManage && post.status === 'searching' && (
+          <>
+            <button className="btn btn-outline-primary" onClick={handleMarkFound}>
+              <i className="fas fa-check me-1"></i>标记已找回
+            </button>
+            <button className="btn btn-outline-danger" onClick={handleCancel}>
+              <i className="fas fa-times me-1"></i>撤销发布
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

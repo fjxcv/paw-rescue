@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authAPI, cmsAPI, communityAPI } from '../api/api';
+import { authAPI, cmsAPI, communityAPI, lostFoundAPI } from '../api/api';
 import { ARTICLE_TYPES, POST_CATEGORIES } from '../constants/site';
 import { confirmLogout } from '../utils/auth';
 import { isAdminUser } from '../components/AdminRoute';
@@ -390,9 +390,18 @@ const AccountCenter = () => {
           <div className="col-md-4">
             <div className="card h-100 shadow-sm">
               <div className="card-body">
+                <h5 className="card-title"><i className="fas fa-search me-2 text-info"></i>我的报失</h5>
+                <p className="card-text text-muted small">查看我发布的报失寻主信息。</p>
+                <Link to="/my-pets" className="btn btn-outline-info btn-sm">进入</Link>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-4">
+            <div className="card h-100 shadow-sm">
+              <div className="card-body">
                 <h5 className="card-title"><i className="fas fa-hand-holding-heart me-2 text-success"></i>我的救助</h5>
                 <p className="card-text text-muted small">查看我上报的救助案例。</p>
-                <Link to="/my-pets" className="btn btn-outline-success btn-sm">进入</Link>
+                <Link to="/rescue" className="btn btn-outline-success btn-sm">进入</Link>
               </div>
             </div>
           </div>

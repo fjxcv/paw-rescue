@@ -23,6 +23,8 @@ class PetProfileViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
+        if self.action == 'my_pets':
+            return [permissions.IsAuthenticated()]
         return [IsAdminRole()]
 
     def get_queryset(self):
@@ -40,6 +42,15 @@ class PetProfileViewSet(viewsets.ModelViewSet):
         elif is_public is not None:
             qs = qs.filter(is_public=is_public.lower() == 'true')
         return qs
+
+    @action(detail=False, methods=['get'], url_path='my')
+    def my_pets(self, request):
+        """获取当前用户发布的领养宠物（通过 rescue_case 关联）"""
+        qs = PetProfile.objects.filter(
+            rescue_case__reporter=request.user,
+        ).select_related('rescue_case')
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
 
 class AdoptApplicationViewSet(viewsets.ModelViewSet):

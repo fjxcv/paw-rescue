@@ -3,6 +3,7 @@ from django.db import models
 
 
 class CmsCategory(models.Model):
+    """文章分类"""
     STATUS_CHOICES = [(0, 'Disabled'), (1, 'Enabled')]
 
     name = models.CharField(max_length=50)
@@ -17,6 +18,7 @@ class CmsCategory(models.Model):
 
 
 class CmsArticle(models.Model):
+    """文章/公告/法规/救助案例"""
     ARTICLE_TYPE_CHOICES = [
         ('science', 'Science'),
         ('announcement', 'Announcement'),
@@ -48,6 +50,7 @@ class CmsArticle(models.Model):
 
 
 class ArticleFavorite(models.Model):
+    """文章收藏"""
     article = models.ForeignKey(CmsArticle, on_delete=models.CASCADE, related_name='favorites')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='article_favorites')
     created_at = models.DateTimeField(auto_now_add=True)

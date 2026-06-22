@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { authAPI, rescueAPI } from '../api/api';
-import { RESCUE_STATUS } from '../constants/site';
+import { lostFoundAPI } from '../api/api';
+import { LOST_FOUND_STATUS, LOST_FOUND_TYPE } from '../constants/site';
 
 const MyPets = () => {
   const navigate = useNavigate();
-  const [cases, setCases] = useState([]);
+  const [lostPosts, setLostPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -14,23 +14,38 @@ const MyPets = () => {
       navigate('/login');
       return;
     }
-    fetchMyRescues();
+    fetchMyData();
   }, [navigate]);
 
-  const fetchMyRescues = async () => {
+  const fetchMyData = async () => {
     try {
       setLoading(true);
-      const [profileRes, rescueRes] = await Promise.all([
-        authAPI.getProfile(),
-        rescueAPI.getAll(),
-      ]);
-      const userId = profileRes.data.id;
-      setCases((rescueRes.data || []).filter((item) => item.reporter?.id === userId));
+      const res = await lostFoundAPI.getMyPosts();
+      setLostPosts(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError('加载您的救助上报失败。');
+      setError('加载您的记录失败。');
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMarkFound = async (id) => {
+    try {
+      await lostFoundAPI.update(id, { status: 'found' });
+      fetchMyData();
+    } catch (err) {
+      alert('操作失败');
+    }
+  };
+
+  const handleCancel = async (id) => {
+    if (!window.confirm('确定要撤销这条发布吗？')) return;
+    try {
+      await lostFoundAPI.update(id, { status: 'cancelled' });
+      fetchMyData();
+    } catch (err) {
+      alert('操作失败');
     }
   };
 
@@ -51,25 +66,72 @@ const MyPets = () => {
   return (
     <div className="container py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2><i className="fas fa-heart me-2 text-danger"></i>我的救助上报</h2>
-        <Link to="/rescue/report" className="btn btn-success">上报救助</Link>
+        <h2 className="mb-0"><i className="fas fa-search me-2 text-danger"></i>我的报失</h2>
+        <Link to="/lost-found/publish" className="btn btn-success">
+          <i className="fas fa-plus me-1"></i>发布信息
+        </Link>
       </div>
 
-      {cases.length === 0 ? (
+      {lostPosts.length === 0 ? (
         <div className="text-center py-5 text-muted">
-          <p>暂无救助上报记录。</p>
-          <Link to="/rescue/report" className="btn btn-outline-success">提交第一条上报</Link>
+          <p>暂无报失寻主记录。</p>
+          <Link to="/lost-found/publish" className="btn btn-outline-success">发布第一条信息</Link>
         </div>
       ) : (
         <div className="row">
-          {cases.map((item) => (
-            <div key={item.id} className="col-md-6 mb-3">
-              <div className="card h-100">
+          {lostPosts.map((post) => (
+            <div key={post.id} className="col-md-6 mb-3">
+              <div className="card h-100 shadow-sm">
+                {post.photo_urls?.[0] && (
+                  <img
+                    src={post.photo_urls[0]}
+                    className="card-img-top"
+                    alt={post.pet_species}
+                    style={{ height: '160px', objectFit: 'cover' }}
+                  />
+                )}
                 <div className="card-body">
-                  <h5 className="card-title">{item.rescue_no}</h5>
-                  <p className="mb-1"><strong>状态：</strong> {RESCUE_STATUS[item.current_status] || item.current_status}</p>
-                  <p className="mb-1"><strong>地点：</strong> {item.discover_address || '未填写'}</p>
-                  <p className="text-muted small">{item.appearance}</p>
+                  <div className="mb-2">
+                    <span className={`badge ${post.post_type === 'lost' ? 'bg-danger' : 'bg-info'} me-1`}>
+                      {LOST_FOUND_TYPE[post.post_type] || post.post_type}
+                    </span>
+                    <span className={`badge ${post.status === 'searching' ? 'bg-warning text-dark' : post.status === 'found' ? 'bg-success' : 'bg-secondary'}`}>
+                      {LOST_FOUND_STATUS[post.status] || post.status}
+                    </span>
+                  </div>
+                  <h5 className="card-title">{post.pet_species}</h5>
+                  <p className="card-text text-muted small">{post.features?.slice(0, 80)}</p>
+                  {post.address_text && (
+                    <p className="small mb-2"><i className="fas fa-map-marker-alt me-1"></i>{post.address_text}</p>
+                  )}
+                  {Number(post.reward_amount) > 0 && (
+                    <p className="small text-warning mb-2">
+                      <i className="fas fa-coins me-1"></i>悬赏 {post.reward_amount} 元
+                    </p>
+                  )}
+                  <div className="d-flex gap-2 mt-2">
+                    <Link to={`/lost-found/${post.id}`} className="btn btn-outline-success btn-sm flex-grow-1">
+                      查看详情
+                    </Link>
+                    {post.status === 'searching' && (
+                      <>
+                        <button
+                          className="btn btn-outline-primary btn-sm"
+                          onClick={() => handleMarkFound(post.id)}
+                          title="标记已找回"
+                        >
+                          <i className="fas fa-check"></i> 已找回
+                        </button>
+                        <button
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={() => handleCancel(post.id)}
+                          title="撤销发布"
+                        >
+                          <i className="fas fa-times"></i> 撤销
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

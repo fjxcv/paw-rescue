@@ -7,5 +7,6 @@ gunicorn
 PyMySQL
 python-dotenv
 whitenoise
+requests
 torch
 torchvision
