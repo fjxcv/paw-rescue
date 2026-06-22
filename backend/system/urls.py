@@ -30,15 +30,15 @@ from .views import (
 
 admin_router = DefaultRouter()
 
-admin_router.register(r'users', AdminUserViewSet, basename='admin-users')
+admin_router.register(r'admin/users', AdminUserViewSet, basename='admin-users')
 
-admin_router.register(r'moderation', AdminModerationViewSet, basename='admin-moderation')
+admin_router.register(r'admin/moderation', AdminModerationViewSet, basename='admin-moderation')
 
-admin_router.register(r'config', AdminConfigViewSet, basename='admin-config')
+admin_router.register(r'admin/config', AdminConfigViewSet, basename='admin-config')
 
-admin_router.register(r'operation-logs', AdminOperationLogViewSet, basename='admin-operation-logs')
+admin_router.register(r'admin/operation-logs', AdminOperationLogViewSet, basename='admin-operation-logs')
 
-admin_router.register(r'ai-logs', AdminAiLogViewSet, basename='admin-ai-logs')
+admin_router.register(r'admin/ai-logs', AdminAiLogViewSet, basename='admin-ai-logs')
 
 
 

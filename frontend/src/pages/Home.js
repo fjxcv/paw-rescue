@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { aiAPI, portalAPI, uploadAPI } from '../api/api';
 import BreedDetectResult from '../components/BreedDetectResult';
@@ -9,6 +9,21 @@ import dogImg from '../Photo/dog.webp';
 import fishImg from '../Photo/fish.webp';
 import rabbitImg from '../Photo/rabbit.jpeg';
 
+const STATS_CONFIG = [
+  { key: 'total_rescued', label: '累计救助', icon: 'fa-check-circle', color: 'success' },
+  { key: 'total_adopted', label: '累计领养', icon: 'fa-home', color: 'primary' },
+  { key: 'searching_count', label: '正在寻找', icon: 'fa-search', color: 'danger' },
+  { key: 'today_reported', label: '今日上报', icon: 'fa-flag', color: 'warning' },
+];
+
+const PET_CATEGORIES = [
+  { name: '猫', image: catImg, link: '/pets?type=cat' },
+  { name: '狗', image: dogImg, link: '/pets?type=dog' },
+  { name: '鸟', image: birdImg, link: '/pets?type=bird' },
+  { name: '兔', image: rabbitImg, link: '/pets?type=rabbit' },
+  { name: '鱼', image: fishImg, link: '/pets?type=fish' },
+];
+
 const Home = () => {
   const [carouselItems, setCarouselItems] = useState([]);
   const [carouselLoading, setCarouselLoading] = useState(true);
@@ -18,13 +33,13 @@ const Home = () => {
   const [aiError, setAiError] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  const petCategories = [
-    { name: '猫', image: catImg, link: '/pets?type=cat' },
-    { name: '狗', image: dogImg, link: '/pets?type=dog' },
-    { name: '鸟', image: birdImg, link: '/pets?type=bird' },
-    { name: '兔', image: rabbitImg, link: '/pets?type=rabbit' },
-    { name: '鱼', image: fishImg, link: '/pets?type=fish' },
-  ];
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
+
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState(false);
 
   const normalizeCarouselTitle = (title) => {
     if (!title) return '';
@@ -51,8 +66,45 @@ const Home = () => {
     fetchCarousel();
   }, []);
 
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(false);
+    try {
+      const res = await portalAPI.getStats();
+      setStats(res.data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setStatsError(true);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const fetchDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError(false);
+    try {
+      const res = await portalAPI.getDashboard();
+      setDashboard(res.data);
+    } catch (err) {
+      console.error('Error fetching dashboard:', err);
+      setDashboardError(true);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
   return (
     <div>
+      {/* 轮播图 */}
       {!carouselLoading && carouselItems.length > 0 && (
         <div id="homeCarousel" className="carousel slide mb-4" data-bs-ride="carousel">
           <div className="carousel-indicators">
@@ -72,9 +124,15 @@ const Home = () => {
             {carouselItems.map((item, index) => (
               <div key={item.id} className={`carousel-item ${index === 0 ? 'active' : ''}`}>
                 {item.link_url ? (
-                  <a href={item.link_url} target="_blank" rel="noopener noreferrer">
-                    <img src={item.image_url} className="d-block w-100" alt={item.title || '轮播图'} style={{ maxHeight: '400px', objectFit: 'cover' }} />
-                  </a>
+                  item.link_url.startsWith('http') ? (
+                    <a href={item.link_url} target="_blank" rel="noopener noreferrer">
+                      <img src={item.image_url} className="d-block w-100" alt={item.title || '轮播图'} style={{ maxHeight: '400px', objectFit: 'cover' }} />
+                    </a>
+                  ) : (
+                    <Link to={item.link_url}>
+                      <img src={item.image_url} className="d-block w-100" alt={item.title || '轮播图'} style={{ maxHeight: '400px', objectFit: 'cover' }} />
+                    </Link>
+                  )
                 ) : (
                   <img src={item.image_url} className="d-block w-100" alt={item.title || '轮播图'} style={{ maxHeight: '400px', objectFit: 'cover' }} />
                 )}
@@ -97,6 +155,160 @@ const Home = () => {
         </div>
       )}
 
+      {/* 核心数据统计 */}
+      <div className="container py-4">
+        <h4 className="text-center mb-4">
+          <i className="fas fa-chart-bar me-2 text-success"></i>
+          平台数据概览
+        </h4>
+        {statsLoading ? (
+          <div className="text-center py-3">
+            <div className="spinner-border spinner-border-sm text-success" role="status"></div>
+            <span className="ms-2 text-muted small">加载统计数据...</span>
+          </div>
+        ) : statsError ? (
+          <div className="text-center py-3">
+            <span className="text-muted small">统计数据加载失败</span>
+            <button className="btn btn-sm btn-outline-secondary ms-2" onClick={fetchStats}>
+              <i className="fas fa-redo me-1"></i>重试
+            </button>
+          </div>
+        ) : stats ? (
+          <div className="row g-3 justify-content-center">
+            {STATS_CONFIG.map((item) => (
+              <div key={item.key} className="col-md-2 col-4">
+                <div className={`card border-${item.color} text-center h-100 shadow-sm`}>
+                  <div className="card-body py-3">
+                    <i className={`fas ${item.icon} fa-2x text-${item.color} mb-2`}></i>
+                    <h3 className="mb-0 fw-bold">{stats[item.key] ?? '-'}</h3>
+                    <small className="text-muted">{item.label}</small>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* 最新聚合动态 */}
+      <div className="container py-4">
+        <h4 className="text-center mb-4">
+          <i className="fas fa-bolt me-2 text-warning"></i>
+          最新动态
+        </h4>
+        {dashboardLoading ? (
+          <div className="text-center py-4">
+            <div className="spinner-border spinner-border-sm text-warning" role="status"></div>
+            <span className="ms-2 text-muted small">加载最新动态...</span>
+          </div>
+        ) : dashboardError ? (
+          <div className="text-center py-4">
+            <span className="text-muted small">动态加载失败</span>
+            <button className="btn btn-sm btn-outline-secondary ms-2" onClick={fetchDashboard}>
+              <i className="fas fa-redo me-1"></i>重新加载
+            </button>
+          </div>
+        ) : dashboard ? (
+          <div className="row g-4">
+            {/* 紧急报失 */}
+            <div className="col-md-4">
+              <div className="card shadow-sm h-100">
+                <div className="card-header bg-danger text-white">
+                  <i className="fas fa-exclamation-triangle me-2"></i>紧急寻主
+                </div>
+                <div className="card-body">
+                  {dashboard.urgent_lost?.length > 0 ? (
+                    <ul className="list-unstyled mb-0">
+                      {dashboard.urgent_lost.map((item) => (
+                        <li key={item.id} className="mb-2 pb-2 border-bottom">
+                          <Link to={`/lost-found/${item.id}`} className="text-decoration-none">
+                            <small className="d-block text-truncate fw-medium">
+                              {item.pet_species} - {item.address_text}
+                            </small>
+                          </Link>
+                          <small className="text-muted">
+                            {item.created_at ? new Date(item.created_at).toLocaleDateString() : ''}
+                            {item.reward_amount > 0 && (
+                              <span className="badge bg-warning text-dark ms-1">悬赏 ¥{item.reward_amount}</span>
+                            )}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted small mb-0">暂无报失信息</p>
+                  )}
+                  <Link to="/lost-found" className="btn btn-outline-danger btn-sm mt-2 w-100">
+                    查看全部 <i className="fas fa-arrow-right ms-1"></i>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* 最新科普 */}
+            <div className="col-md-4">
+              <div className="card shadow-sm h-100">
+                <div className="card-header bg-success text-white">
+                  <i className="fas fa-graduation-cap me-2"></i>科普文章
+                </div>
+                <div className="card-body">
+                  {dashboard.science_articles?.length > 0 ? (
+                    <ul className="list-unstyled mb-0">
+                      {dashboard.science_articles.map((item) => (
+                        <li key={item.id} className="mb-2 pb-2 border-bottom">
+                          <Link to={`/cms/${item.id}`} className="text-decoration-none">
+                            <small className="d-block text-truncate fw-medium">{item.title}</small>
+                          </Link>
+                          <small className="text-muted">
+                            {item.published_at ? new Date(item.published_at).toLocaleDateString() : ''}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted small mb-0">暂无科普文章</p>
+                  )}
+                  <Link to="/cms?type=science" className="btn btn-outline-success btn-sm mt-2 w-100">
+                    查看更多 <i className="fas fa-arrow-right ms-1"></i>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* 最新公告 */}
+            <div className="col-md-4">
+              <div className="card shadow-sm h-100">
+                <div className="card-header bg-warning text-dark">
+                  <i className="fas fa-bullhorn me-2"></i>最新公告
+                </div>
+                <div className="card-body">
+                  {dashboard.announcements?.length > 0 ? (
+                    <ul className="list-unstyled mb-0">
+                      {dashboard.announcements.map((item) => (
+                        <li key={item.id} className="mb-2 pb-2 border-bottom">
+                          <Link to={`/cms/${item.id}`} className="text-decoration-none">
+                            <small className="d-block text-truncate fw-medium">{item.title}</small>
+                          </Link>
+                          <small className="text-muted">
+                            {item.published_at ? new Date(item.published_at).toLocaleDateString() : ''}
+                          </small>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-muted small mb-0">暂无公告</p>
+                  )}
+                  <Link to="/cms?type=announcement" className="btn btn-outline-warning btn-sm mt-2 w-100">
+                    查看全部公告 <i className="fas fa-arrow-right ms-1"></i>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Hero 区域 */}
       <div className="hero-section text-center py-5 position-relative">
         <div className="hero-background">
           <div className="floating-pets">
@@ -130,6 +342,7 @@ const Home = () => {
         </div>
       </div>
 
+      {/* AI 品种识别 */}
       <div className="container py-4">
         <div className="card shadow-sm border-success">
           <div className="card-body">
@@ -199,11 +412,12 @@ const Home = () => {
         </div>
       </div>
 
+      {/* 宠物分类 */}
       <div className="pet-categories-section py-5">
         <div className="container">
           <h3 className="text-center mb-5">浏览宠物分类</h3>
           <div className="row justify-content-center">
-            {petCategories.map((category, index) => (
+            {PET_CATEGORIES.map((category, index) => (
               <div key={index} className="col-md-2 col-4 col-6 mb-4 text-center">
                 <Link to={category.link} className="text-decoration-none">
                   <div className="pet-category-circle">
