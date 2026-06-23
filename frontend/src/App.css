@@ -56,7 +56,7 @@
 .tab-wrap .nav-link {
   border: none !important;
   /* 移除胶囊圆角 999px，改为直角 */
-  border-radius: 0 !important;
+  border-radius: 8px !important;
   /* 去掉默认浅灰底色，设透明 */
   background-color: transparent;
   color: #4b5563;

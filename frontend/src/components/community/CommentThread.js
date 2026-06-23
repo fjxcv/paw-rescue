@@ -42,7 +42,7 @@ const CommentRow = ({
             onClick={() => onLike(comment)}
             title={currentUserId ? '点赞' : '登录后点赞'}
           >
-            <span>赞</span>
+            <span>❤</span>
             <span className="comment-action-count">{comment.like_count || 0}</span>
           </button>
           {currentUserId && (

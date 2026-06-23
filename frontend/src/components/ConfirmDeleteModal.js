@@ -63,6 +63,9 @@ const ConfirmDeleteModal = ({
 
         .modal-footer {
           border-top: 1px solid #e9ecef;
+          /* 核心：按钮居中 */
+          justify-content: center;
+          gap: 12px;
         }
 
         .btn-danger {

@@ -29,10 +29,10 @@ export const AuthPromptProvider = ({ children }) => {
                 <button type="button" className="btn-close" onClick={close} aria-label="Close" />
               </div>
               <div className="modal-body">
-                <p>登录后即可使用点赞、收藏、评论、我的收藏等功能。</p>
+                <p>请先登录以使用互动功能。</p>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={close}>
+              <div className="modal-footer justify-content-center">
+                <button type="button" className="btn btn-secondary me-2" onClick={close}>
                   取消
                 </button>
                 <button

@@ -200,7 +200,7 @@ const Register = () => {
               </div>
               <div className="modal-body">
                 <p>
-                  本平台（宠物社区）严格保护用户个人隐私，本政策用于说明我们如何收集、使用、保存和保护您的个人信息。使用本站服务，即代表您同意本隐私政策全部内容。
+                  本平台严格保护用户个人隐私，本政策用于说明我们如何收集、使用、保存和保护您的个人信息。使用本站服务，即代表您同意本隐私政策全部内容。
                 </p>
               </div>
               <div className="modal-footer">
@@ -275,6 +275,11 @@ const Register = () => {
 
         .logo-placeholder i {
           color: white;
+        }
+
+        /* 弹窗底部按钮居中核心样式 */
+        .modal-footer {
+          justify-content: center;
         }
 
         @media (max-width: 576px) {
