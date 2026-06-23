@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Count
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -11,6 +12,7 @@ from accounts.models import UserProfile
 from accounts.serializers import UserSerializer
 from cms.models import CmsArticle
 from community.models import CommunityPost
+from common.ai_quota import AiQuotaExceededError, check_ai_quota, get_ai_usage_stats, log_quota_exceeded
 from common.breed_classifier import BreedModelNotReadyError
 from common.breed_detect import detect_pet_breed
 from common.image_loader import ImageLoadError
@@ -120,10 +122,20 @@ def _ai_error_response(exc):
     return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
 
 
+def _ai_quota_response(exc, user, feature_type, request_meta=''):
+    log_quota_exceeded(user, feature_type, request_meta)
+    return Response({'detail': str(exc)}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+
 class AiBreedDetectView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        try:
+            check_ai_quota(request.user)
+        except AiQuotaExceededError as exc:
+            return _ai_quota_response(exc, request.user, 'breed_detect')
+
         image_url = (request.data.get('image_url') or '').strip()
         image_base64 = (request.data.get('image_base64') or '').strip()
         description = (request.data.get('description') or '').strip()
@@ -181,6 +193,11 @@ class AiAdoptCopyView(APIView):
 
     def post(self, request):
         meta = str(request.data)
+        try:
+            check_ai_quota(request.user)
+        except AiQuotaExceededError as exc:
+            return _ai_quota_response(exc, request.user, 'adopt_copy', meta)
+
         pet_info = json.dumps(request.data, ensure_ascii=False)
         try:
             copy_text = chat([
@@ -206,6 +223,11 @@ class AiQaView(APIView):
     def post(self, request):
         question = request.data.get('question', '')
         history = request.data.get('history') or []
+        try:
+            check_ai_quota(request.user)
+        except AiQuotaExceededError as exc:
+            return _ai_quota_response(exc, request.user, 'qa_assistant', question)
+
         messages = [{'role': 'system', 'content': '\u4f60\u662f\u6696\u722a\u6551\u52a9\u5e73\u53f0\u7684\u667a\u80fd\u517b\u5ba0\u52a9\u624b\uff0c\u8bf7\u7528\u4e2d\u6587\u7b80\u6d01\u3001\u4e13\u4e1a\u5730\u56de\u7b54\u3002'}]
         for item in history[-6:]:
             role = item.get('role')
@@ -228,7 +250,18 @@ class AiQaView(APIView):
             return _ai_error_response(exc)
 
 
+class AiLogPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+
 class AdminAiLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AiInvocationLog.objects.select_related('user').all()
     serializer_class = AiInvocationLogSerializer
     permission_classes = [IsAdminRole]
+    pagination_class = AiLogPagination
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        return Response(get_ai_usage_stats())

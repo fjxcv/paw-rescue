@@ -2,7 +2,7 @@
 """
 Scan source trees and rewrite non-UTF-8 text files as UTF-8 (no BOM).
 
-Usage (from repo root pet-connect-web):
+Usage (from repo root paw-rescue):
   backend\\venv\\Scripts\\python.exe scripts\\ensure_utf8.py
   backend\\venv\\Scripts\\python.exe scripts\\ensure_utf8.py --check   # exit 1 if fixes needed
 """

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminAPI, communityAPI } from '../api/api';
 import AdminManageBar from '../components/AdminManageBar';
+import ModerationReasonModal from '../components/ModerationReasonModal';
 import { POST_CATEGORIES } from '../constants/site';
 
 const CATEGORY_TABS = [
@@ -14,6 +15,14 @@ const ORDER_OPTIONS = [
   { key: 'likes', label: '最多点赞' },
 ];
 
+const getApiError = (err) => {
+  const d = err.response?.data;
+  if (typeof d === 'string') return d;
+  if (d?.detail) return String(d.detail);
+  if (d?.reason) return String(d.reason);
+  return err.message || '请求失败';
+};
+
 const CommunityList = () => {
   const [posts, setPosts] = useState([]);
   const [category, setCategory] = useState('');
@@ -23,6 +32,8 @@ const CommunityList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [likingId, setLikingId] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [modalSubmitting, setModalSubmitting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQ(searchInput.trim()), 300);
@@ -50,23 +61,54 @@ const CommunityList = () => {
     fetchPosts();
   }, [fetchPosts]);
 
-  const handleAdminDelete = async (postId) => {
-    if (!window.confirm('确定删除该帖子？')) return;
-    try {
-      await communityAPI.deletePost(postId);
-      fetchPosts();
-    } catch (err) {
-      alert('删除失败');
+  const openModerationModal = (type, post) => {
+    if (type === 'delete') {
+      setModal({
+        type: 'delete',
+        post,
+        title: '删除社区帖子',
+        actionLabel: '确认删除',
+        targetLabel: post.title,
+      });
+    } else {
+      setModal({
+        type: 'ban',
+        post,
+        title: '封禁用户',
+        actionLabel: '确认封禁',
+        targetLabel: post.author?.username || `用户 #${post.author?.id}`,
+      });
     }
   };
 
-  const handleBanUser = async (userId) => {
-    if (!window.confirm('确定封禁该用户？')) return;
+  const handleModerationConfirm = async (reason) => {
+    if (!modal) return;
+    setModalSubmitting(true);
     try {
-      await adminAPI.updateUser(userId, { status: 1 });
-      alert('已封禁');
+      if (modal.type === 'delete') {
+        await adminAPI.createModeration({
+          content_type: 'community_post',
+          content_id: modal.post.id,
+          action: 'delete',
+          reason,
+          target_summary: modal.post.title?.slice(0, 200) || '',
+        });
+      } else {
+        await adminAPI.createModeration({
+          content_type: 'user',
+          content_id: modal.post.author.id,
+          action: 'ban',
+          reason,
+          target_summary: modal.post.author?.username || '',
+        });
+      }
+      setModal(null);
+      alert(modal.type === 'delete' ? '帖子已删除' : '用户已封禁');
+      fetchPosts();
     } catch (err) {
-      alert('操作失败');
+      alert(getApiError(err));
+    } finally {
+      setModalSubmitting(false);
     }
   };
 
@@ -103,6 +145,16 @@ const CommunityList = () => {
 
   return (
     <div className="py-3">
+      <ModerationReasonModal
+        show={!!modal}
+        title={modal?.title}
+        targetLabel={modal?.targetLabel}
+        actionLabel={modal?.actionLabel}
+        submitting={modalSubmitting}
+        onConfirm={handleModerationConfirm}
+        onCancel={() => !modalSubmitting && setModal(null)}
+      />
+
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2><i className="fas fa-comments me-2 text-success"></i>社区交流</h2>
         <Link to="/community/publish" className="btn btn-success">
@@ -169,9 +221,8 @@ const CommunityList = () => {
               <div key={post.id} className="list-group-item list-group-item-action mb-2 rounded shadow-sm">
                 <AdminManageBar
                   userId={post.author?.id}
-                  onHide={() => handleAdminDelete(post.id)}
-                  onDelete={() => handleAdminDelete(post.id)}
-                  onBanUser={() => handleBanUser(post.author.id)}
+                  onDelete={() => openModerationModal('delete', post)}
+                  onBanUser={post.author?.id ? () => openModerationModal('ban', post) : undefined}
                 />
                 <div className="d-flex w-100 justify-content-between align-items-start">
                   <div className="flex-grow-1 text-start">

@@ -16,7 +16,7 @@ def _chat_completion(messages, max_tokens=1024):
     api_key = os.getenv('LLM_API_KEY', '').strip()
     if not api_key:
         raise LLMNotConfiguredError(
-            'LLM_API_KEY is not configured. Add it to backend/.env to enable AI features.'
+            '\u672a\u914d\u7f6e LLM_API_KEY\uff0c\u8bf7\u5728 backend/.env \u4e2d\u8bbe\u7f6e\u540e\u91cd\u542f\u540e\u7aef\u3002'
         )
     base = os.getenv('LLM_API_BASE', 'https://api.openai.com/v1').rstrip('/')
     model = os.getenv('LLM_MODEL', 'gpt-4o-mini')

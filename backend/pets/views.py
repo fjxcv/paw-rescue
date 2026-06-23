@@ -1,24 +1,33 @@
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from common.permissions import IsAdminRole
+from common.permissions import IsAdminRole, user_is_admin
 from common.utils import get_client_ip, write_operation_log
 from .models import AdoptApplication, AdoptAttachment, AdoptOfflineVerify, AdoptQuestionnaire, PetProfile
 from .serializers import (
     AdoptApplicationAuditSerializer,
+    AdoptApplicationReviewDetailSerializer,
     AdoptApplicationSerializer,
+    AdminAdoptApplicationListSerializer,
     AdoptAttachmentSerializer,
     AdoptOfflineVerifySerializer,
     AdoptQuestionnaireSerializer,
     PetProfileSerializer,
+    PetProfileUpdateSerializer,
 )
 
 
 class PetProfileViewSet(viewsets.ModelViewSet):
     queryset = PetProfile.objects.all()
     serializer_class = PetProfileSerializer
+
+    def get_serializer_class(self):
+        if self.action in ['update', 'partial_update']:
+            return PetProfileUpdateSerializer
+        return PetProfileSerializer
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -59,11 +68,14 @@ class PetProfileViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(is_public=True)
         elif is_public is not None:
             qs = qs.filter(is_public=is_public.lower() == 'true')
+        elif self.action in ['list', 'retrieve']:
+            if not (self.request.user.is_authenticated and getattr(self.request.user.profile, 'role', None) == 'admin'):
+                qs = qs.filter(is_public=True)
         return qs
 
     @action(detail=False, methods=['get'], url_path='my')
     def my_pets(self, request):
-        """获取当前用户发布的领养宠物（通过 rescue_case 关联）"""
+        """Get pets published by current user via rescue_case."""
         qs = PetProfile.objects.filter(
             rescue_case__reporter=request.user,
         ).select_related('rescue_case')
@@ -77,16 +89,31 @@ class AdoptApplicationViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
 
     def get_permissions(self):
-        if self.action in ['create', 'my', 'retrieve', 'questionnaire', 'attachments']:
+        if self.action in ['create', 'my', 'questionnaire', 'attachments']:
+            return [permissions.IsAuthenticated()]
+        if self.action == 'retrieve':
             return [permissions.IsAuthenticated()]
         return [IsAdminRole()]
 
     def get_queryset(self):
-        if self.action in ['my', 'retrieve']:
-            return self.queryset.filter(applicant=self.request.user)
-        return self.queryset
+        qs = self.queryset.prefetch_related('attachments').select_related('questionnaire')
+        if self.action == 'my':
+            return qs.filter(applicant=self.request.user)
+        if self.action == 'retrieve':
+            if user_is_admin(self.request.user):
+                return qs
+            return qs.filter(applicant=self.request.user)
+        return qs
 
     def perform_create(self, serializer):
+        pet = serializer.validated_data['pet']
+        if pet.adoption_status != 'available':
+            raise ValidationError({'pet_id': '\u8be5\u5ba0\u7269\u5f53\u524d\u4e0d\u53ef\u7533\u8bf7\u9886\u517b'})
+        if AdoptApplication.objects.filter(
+            pet=pet,
+            online_status__in=['pending', 'approved'],
+        ).exists():
+            raise ValidationError({'pet_id': '\u8be5\u5ba0\u7269\u5df2\u6709\u8fdb\u884c\u4e2d\u7684\u9886\u517b\u7533\u8bf7'})
         app = serializer.save(applicant=self.request.user)
         app.pet.adoption_status = 'pending'
         app.pet.save(update_fields=['adoption_status', 'updated_at'])
@@ -133,15 +160,27 @@ class AdoptApplicationViewSet(viewsets.ModelViewSet):
 
 
 class AdminAdoptApplicationViewSet(viewsets.GenericViewSet):
-    queryset = AdoptApplication.objects.all()
+    queryset = AdoptApplication.objects.select_related(
+        'applicant', 'applicant__profile', 'pet', 'pet__rescue_case', 'auditor',
+    ).prefetch_related('attachments', 'questionnaire').all()
     serializer_class = AdoptApplicationAuditSerializer
     permission_classes = [IsAdminRole]
+
+    def list(self, request):
+        qs = self.get_queryset()
+        serializer = AdminAdoptApplicationListSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def review_detail(self, request, pk=None):
+        app = self.get_object()
+        return Response(AdoptApplicationReviewDetailSerializer(app).data)
 
     def update(self, request, pk=None):
         app = self.get_object()
         serializer = self.get_serializer(app, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        app.refresh_from_db()
         write_operation_log(
             request.user, 'adopt', 'audit',
             f'Adopt application audit #{app.id}: {app.online_status}',
@@ -161,7 +200,7 @@ class AdminOfflineVerifyViewSet(viewsets.GenericViewSet):
         verify_note = request.data.get('verify_note', verify.verify_note)
         if new_status == 'failed' and not (verify_note or '').strip():
             return Response(
-                {'verify_note': '核验失败时必须填写失败原因'},
+                {'verify_note': '\u6838\u9a8c\u5931\u8d25\u65f6\u5fc5\u987b\u586b\u5199\u5931\u8d25\u539f\u56e0'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         verify.verify_status = new_status
@@ -172,6 +211,7 @@ class AdminOfflineVerifyViewSet(viewsets.GenericViewSet):
         if verify.verify_status == 'passed':
             verify.application.online_status = 'approved'
             verify.application.pet.adoption_status = 'adopted'
+            verify.application.pet.is_public = False
         elif verify.verify_status == 'failed':
             verify.application.online_status = 'rejected'
             verify.application.pet.adoption_status = 'available'

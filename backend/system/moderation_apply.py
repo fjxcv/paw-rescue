@@ -7,12 +7,23 @@ CONTENT_TYPES = [
     ('community_post', 'Community Post'),
     ('cms_article', 'CMS Article'),
     ('lost_found_post', 'Lost/Found Post'),
+    ('user', 'User'),
 ]
 
 
 def apply_moderation(content_type, content_id, action):
-    """Apply hide/delete to the underlying content record."""
+    """Apply hide/delete/ban to the underlying record."""
     if action == 'approve':
+        return
+    if content_type == 'user':
+        if action != 'ban':
+            raise ValueError('user moderation only supports ban action')
+        from accounts.models import UserProfile
+        profile = UserProfile.objects.filter(user_id=content_id).first()
+        if not profile:
+            raise ValueError('user not found')
+        profile.status = 1
+        profile.save(update_fields=['status', 'updated_at'])
         return
     if content_type == 'community_post':
         post = CommunityPost.objects.filter(pk=content_id).first()

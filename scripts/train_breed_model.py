@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Fine-tune MobileNetV3-Small on Oxford-IIIT Pet (37 breeds, public dataset).
-Run from pet-connect-web:
+Run from paw-rescue:
   backend\\venv\\Scripts\\python.exe scripts\\train_breed_model.py
 """
 from __future__ import annotations

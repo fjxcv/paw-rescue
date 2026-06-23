@@ -2,7 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminAPI, authAPI, lostFoundAPI } from '../api/api';
 import AdminManageBar from '../components/AdminManageBar';
+import ModerationReasonModal from '../components/ModerationReasonModal';
 import { LOST_FOUND_STATUS, LOST_FOUND_TYPE } from '../constants/site';
+
+const getApiError = (err) => {
+  const d = err.response?.data;
+  if (typeof d === 'string') return d;
+  if (d?.detail) return String(d.detail);
+  if (d?.reason) return String(d.reason);
+  return err.message || '请求失败';
+};
 
 const POST_TYPE_TABS = [
   { key: '', label: '全部类型' },
@@ -31,7 +40,7 @@ const LostFoundList = () => {
   const [nearbyRadius, setNearbyRadius] = useState(5);
   const [nearbyLocationFixed, setNearbyLocationFixed] = useState(null); // 固定用户位置，避免重复定位
 
-  // 悬赏筛选
+  // 悬赏筛
   const [hasReward, setHasReward] = useState(false);
 
   // 地图显示
@@ -39,6 +48,8 @@ const LostFoundList = () => {
 
   // 当前用户ID（用于显示管理按钮）
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [modalSubmitting, setModalSubmitting] = useState(false);
 
   useEffect(() => {
     authAPI.getProfile().then((res) => {
@@ -108,6 +119,65 @@ const LostFoundList = () => {
     }
   }, [nearbyMode, nearbyLocationFixed, nearbyRadius, postType, status, searchQ, hasReward, doNearbySearch]);
 
+  const refreshPosts = useCallback(() => {
+    if (nearbyMode && nearbyLocationFixed) {
+      doNearbySearch(nearbyLocationFixed, nearbyRadius, postType, status, searchQ, hasReward);
+    } else {
+      fetchPosts();
+    }
+  }, [nearbyMode, nearbyLocationFixed, nearbyRadius, postType, status, searchQ, hasReward, doNearbySearch, fetchPosts]);
+
+  const openModerationModal = (type, post) => {
+    if (type === 'delete') {
+      setModal({
+        type: 'delete',
+        post,
+        title: '删除报失/寻主信息',
+        actionLabel: '确认删除',
+        targetLabel: `${post.pet_species} - ${post.address_text || post.id}`,
+      });
+    } else {
+      setModal({
+        type: 'ban',
+        post,
+        title: '封禁用户',
+        actionLabel: '确认封禁',
+        targetLabel: post.publisher?.username || `用户 #${post.publisher?.id}`,
+      });
+    }
+  };
+
+  const handleModerationConfirm = async (reason) => {
+    if (!modal) return;
+    setModalSubmitting(true);
+    try {
+      if (modal.type === 'delete') {
+        await adminAPI.createModeration({
+          content_type: 'lost_found_post',
+          content_id: modal.post.id,
+          action: 'delete',
+          reason,
+          target_summary: `${modal.post.pet_species}`.slice(0, 200),
+        });
+      } else {
+        await adminAPI.createModeration({
+          content_type: 'user',
+          content_id: modal.post.publisher.id,
+          action: 'ban',
+          reason,
+          target_summary: modal.post.publisher?.username || '',
+        });
+      }
+      setModal(null);
+      alert(modal.type === 'delete' ? '信息已删除' : '用户已封禁');
+      refreshPosts();
+    } catch (err) {
+      alert(getApiError(err));
+    } finally {
+      setModalSubmitting(false);
+    }
+  };
+
   // 首次附近搜索（获取位置）
   const handleNearbySearch = () => {
     if (!navigator.geolocation) {
@@ -138,7 +208,7 @@ const LostFoundList = () => {
     );
   };
 
-  // 退出附近搜索模式
+  // 逢出附近搜索模弄
   const exitNearbyMode = () => {
     setNearbyMode(false);
     setShowMap(false);
@@ -193,9 +263,10 @@ const LostFoundList = () => {
   <div id="map"></div>
   <script>
     var map = L.map('map').setView([${centerLat}, ${centerLon}], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+      subdomains: ['1', '2', '3', '4'],
+      attribution: '© 高德地图'
     }).addTo(map);
     ${markersJs.join(';\n    ')}
     // 自动适配边界
@@ -208,6 +279,15 @@ const LostFoundList = () => {
 
   return (
     <div className="py-3">
+      <ModerationReasonModal
+        show={!!modal}
+        title={modal?.title}
+        targetLabel={modal?.targetLabel}
+        actionLabel={modal?.actionLabel}
+        submitting={modalSubmitting}
+        onConfirm={handleModerationConfirm}
+        onCancel={() => !modalSubmitting && setModal(null)}
+      />
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <h2><i className="fas fa-search-location me-2 text-success"></i>报失寻主</h2>
         <div className="d-flex gap-2">
@@ -299,8 +379,8 @@ const LostFoundList = () => {
                   loading="lazy"
                 ></iframe>
                 <div className="p-2 small text-muted d-flex align-items-center gap-3 flex-wrap">
-                  <span><span className="badge bg-danger me-1" style={{width:12,height:12,borderRadius:'50%',display:'inline-block',padding:0}}>&nbsp;</span>报失</span>
-                  <span><span className="badge bg-info me-1" style={{width:12,height:12,borderRadius:'50%',display:'inline-block',padding:0}}>&nbsp;</span>寻主</span>
+                  <span><span className="badge bg-danger me-1" style={{width:12,height:12,borderRadius:'50%',display:'inline-block',padding:0}}>&nbsp;</span>寻宠</span>
+                  <span><span className="badge bg-info me-1" style={{width:12,height:12,borderRadius:'50%',display:'inline-block',padding:0}}>&nbsp;</span>招领</span>
                   <span><svg width="14" height="20" viewBox="0 0 28 40" style={{verticalAlign:'middle',marginRight:4}}><path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="#4A90D9"/><circle cx="14" cy="14" r="6" fill="white"/></svg>你的位置</span>
                 </div>
               </div>
@@ -333,7 +413,7 @@ const LostFoundList = () => {
               onChange={(e) => setHasReward(e.target.checked)}
             />
             <label className="form-check-label" htmlFor="hasReward">
-              <i className="fas fa-coins text-warning me-1"></i>仅看有悬赏
+              <i className="fas fa-coins text-warning me-1"></i>仅看有赏金
             </label>
           </div>
         </div>
@@ -398,14 +478,8 @@ const LostFoundList = () => {
                   <div className="card-body text-start">
                     <AdminManageBar
                       userId={post.publisher?.id}
-                      onHide={async () => {
-                        await lostFoundAPI.update(post.id, { status: 'cancelled' });
-                        fetchPosts();
-                      }}
-                      onBanUser={post.publisher?.id ? async () => {
-                        await adminAPI.updateUser(post.publisher.id, { status: 1 });
-                        alert('已封禁');
-                      } : undefined}
+                      onDelete={() => openModerationModal('delete', post)}
+                      onBanUser={post.publisher?.id ? () => openModerationModal('ban', post) : undefined}
                     />
                     <div className="mb-2">
                       <span className={`badge ${post.post_type === 'lost' ? 'bg-danger' : 'bg-info'}`}>
@@ -427,7 +501,7 @@ const LostFoundList = () => {
                     )}
                     {Number(post.reward_amount) > 0 && (
                       <p className="small text-warning mb-2">
-                        <i className="fas fa-coins me-1"></i>悬赏 {post.reward_amount} 元
+                        <i className="fas fa-coins me-1"></i>悬赏 {post.reward_amount} 兄
                       </p>
                     )}
                     <div className="d-flex gap-2 mt-2">
@@ -442,7 +516,7 @@ const LostFoundList = () => {
                               await lostFoundAPI.update(post.id, { status: 'found' });
                               fetchPosts();
                             }}
-                            title="标记已找回"
+                            title="标记已找到"
                           >
                             <i className="fas fa-check"></i>
                           </button>

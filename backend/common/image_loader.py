@@ -118,7 +118,7 @@ def _load_from_url(image_url: str, request=None) -> tuple[bytes, str, str]:
 
     req = urllib.request.Request(
         image_url,
-        headers={'User-Agent': 'PetConnect/1.0'},
+        headers={'User-Agent': 'PawRescue/1.0'},
     )
     try:
         with urllib.request.urlopen(req, timeout=25) as resp:

@@ -38,7 +38,6 @@ class LostFoundPostSerializer(serializers.ModelSerializer):
         read_only_fields = ['publisher', 'created_at', 'updated_at', 'contact_phone_display']
 
     def get_contact_phone_display(self, obj):
-        """联系方式脱敏：非本人或管理员显示为 138****0000"""
         request = self.context.get('request')
         phone = obj.contact_phone
         if not phone:
@@ -53,9 +52,13 @@ class LostFoundPostSerializer(serializers.ModelSerializer):
             return phone_str[:3] + '****' + phone_str[-4:]
         return phone_str[:3] + '****'
 
+    def validate_photo_urls(self, value):
+        if not value or not isinstance(value, list) or len(value) < 1:
+            raise serializers.ValidationError('\u8bf7\u81f3\u5c11\u4e0a\u4f20 1 \u5f20\u5ba0\u7269\u7167\u7247')
+        return value
+
     def validate_address_text(self, value):
         text = (value or '').strip()
         if not text:
-            # 允许为空，由 perform_create 中的逆地理编码填充
             return ''
         return text

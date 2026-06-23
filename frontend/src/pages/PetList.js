@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { petsAPI } from '../api/api';
 import { ADOPTION_STATUS } from '../constants/site';
 import AdminManageBar from '../components/AdminManageBar';
+import { useManageMode } from '../context/ManageModeContext';
 
 // ===== 常量定义 =====
 
@@ -164,6 +165,7 @@ const ADOPTION_BADGE = {
 
 const PetList = () => {
   const navigate = useNavigate();
+  const { canManage } = useManageMode();
   const [pets, setPets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -207,24 +209,24 @@ const PetList = () => {
   }, [search, speciesFilter, genderFilter, ageRangeFilter, locationFilter, setSearchParams]);
 
   // ===== 请求宠物列表（除搜索外，其他筛选变化直接触发）=====
-  useEffect(() => {
-    const fetchPets = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = buildApiParams();
-        const response = await petsAPI.getAll(params);
-        setPets(Array.isArray(response.data) ? response.data : response.data.results || []);
-      } catch (err) {
-        setError('加载宠物列表失败，请稍后重试。');
-        console.error('Error fetching pets:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchPets = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = buildApiParams();
+      const response = await petsAPI.getAll(params);
+      setPets(Array.isArray(response.data) ? response.data : response.data.results || []);
+    } catch (err) {
+      setError('加载宠物列表失败，请稍后重试。');
+      console.error('Error fetching pets:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [buildApiParams]);
 
+  useEffect(() => {
     fetchPets();
-  }, [speciesFilter, genderFilter, ageRangeFilter, locationFilter, search, buildApiParams]);
+  }, [fetchPets]);
 
   // ===== 搜索确认按钮 =====
   const handleSearchConfirm = () => {
@@ -466,26 +468,45 @@ const PetList = () => {
                       e.target.src = 'https://via.placeholder.com/300x200?text=Pet+Photo';
                     }}
                   />
-                  <span className={`pet-status-badge badge bg-${ADOPTION_BADGE[pet.adoption_status] || 'secondary'}`}>
-                    {ADOPTION_STATUS[pet.adoption_status] || '未知'}
-                  </span>
                 </div>
 
                 <div className="pet-card-body">
-                  {/* 管理员操作栏 — 阻止冒泡防止触发卡片点击跳转 */}
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <AdminManageBar
-                      onEdit={() => window.location.assign(`/pets/${pet.id}`)}
-                      onHide={async () => {
-                        await petsAPI.update(pet.id, { is_public: false });
-                        window.location.reload();
-                      }}
-                      onDelete={async () => {
-                        if (!window.confirm('确定删除？')) return;
-                        await petsAPI.delete(pet.id);
-                        window.location.reload();
-                      }}
-                    />
+                  <div
+                    className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="d-flex align-items-center gap-1 flex-wrap">
+                      <span className={`badge bg-${ADOPTION_BADGE[pet.adoption_status] || 'secondary'}`}>
+                        {ADOPTION_STATUS[pet.adoption_status] || '未知'}
+                      </span>
+                      {canManage && !pet.is_public && (
+                        <span className="badge bg-secondary">未公开</span>
+                      )}
+                    </div>
+                    <div className="flex-grow-1">
+                      <AdminManageBar
+                        compact
+                        onEdit={() => window.location.assign(`/pets/${pet.id}`)}
+                        onHide={async () => {
+                          try {
+                            await petsAPI.update(pet.id, { is_public: false });
+                            alert('已设为不公开');
+                            fetchPets();
+                          } catch (err) {
+                            alert(err.response?.data?.detail || '操作失败');
+                          }
+                        }}
+                        onDelete={async () => {
+                          if (!window.confirm('确定删除？')) return;
+                          try {
+                            await petsAPI.delete(pet.id);
+                            fetchPets();
+                          } catch (err) {
+                            alert(err.response?.data?.detail || '删除失败');
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {/* 宠物名称 + 种类图标 */}

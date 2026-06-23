@@ -12,9 +12,9 @@ class PetProfile(models.Model):
     ]
 
     SIZE_CATEGORY_CHOICES = [
-        ('small', '小型'),
-        ('medium', '中型'),
-        ('large', '大型'),
+        ('small', '\u5c0f\u578b'),
+        ('medium', '\u4e2d\u578b'),
+        ('large', '\u5927\u578b'),
     ]
 
     rescue_case = models.ForeignKey(

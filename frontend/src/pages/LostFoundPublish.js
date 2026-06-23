@@ -2,14 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom';
 import { aiAPI, lostFoundAPI, uploadAPI } from '../api/api';
 import { LOST_FOUND_TYPE } from '../constants/site';
+import { AMAP_KEY, AMAP_TILE_URL, AMAP_TILE_OPTIONS } from '../config/amap';
 import { formatApiError, roundCoordinate } from '../utils/apiError';
-
-// ============================================================
-// 高德地图 Web API 配置
-// 使用前请将下方占位符替换为你自己的高德 Web API Key
-// 申请地址：https://console.amap.com/dev/key/app
-// ============================================================
-const AMAP_KEY = 'e9b57a099f261b32a70742305ae7e705'; // ← 请替换为你的高德 Key
 
 /**
  * GCJ-02 转 WGS-84（火星坐标系 → GPS 标准坐标系）
@@ -75,14 +69,12 @@ async function amapPlaceText(keywords, city = '成都') {
   return data.pois.map((poi) => {
     const gcjLat = parseFloat(poi.location.split(',')[1]);
     const gcjLng = parseFloat(poi.location.split(',')[0]);
-    // 高德坐标（GCJ-02）转 WGS-84 用于 Leaflet 地图
-    const wgs = gcj02ToWgs84(gcjLat, gcjLng);
     return {
       id: poi.id,
       name: poi.name,
       address: poi.address || '',
-      lat: wgs.lat,
-      lng: wgs.lng,
+      lat: gcjLat,
+      lng: gcjLng,
       distance: poi.distance,
     };
   });
@@ -129,6 +121,7 @@ const LostFoundPublish = () => {
   const [locating, setLocating] = useState(false);
   const [locationHint, setLocationHint] = useState('');
   const [error, setError] = useState('');
+  const [photoError, setPhotoError] = useState('');
   const [mapReady, setMapReady] = useState(false);
   const mapCenter = useMemo(() => [30.5728, 104.0668], []); // 默认成都
   const mapRef = useRef(null);
@@ -241,10 +234,7 @@ const LostFoundPublish = () => {
       if (cancelled || !mapRef.current) return;
       const L = window.L;
       const map = L.map(mapRef.current).setView(mapCenter, 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
-      }).addTo(map);
+      L.tileLayer(AMAP_TILE_URL, AMAP_TILE_OPTIONS).addTo(map);
 
       const marker = L.marker(mapCenter, { draggable: true }).addTo(map);
       markerRef.current = marker;
@@ -290,7 +280,15 @@ const LostFoundPublish = () => {
       }
     }
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (leafletMapRef.current) {
+        leafletMapRef.current.remove();
+        leafletMapRef.current = null;
+        markerRef.current = null;
+        setMapReady(false);
+      }
+    };
   }, [mapCenter, updateMarkerPosition]);
 
   // 当使用当前位置时，移动地图和标记
@@ -381,6 +379,11 @@ const LostFoundPublish = () => {
       setError('请填写事发地点或附近地标。');
       return;
     }
+    if (!photoUrls.length) {
+      setPhotoError('请至少上传 1 张宠物照片。');
+      return;
+    }
+    setPhotoError('');
     setSubmitting(true);
     setError('');
     try {
@@ -425,12 +428,21 @@ const LostFoundPublish = () => {
       <form onSubmit={handleSubmit} className="card shadow-sm">
         <div className="card-body">
           <div className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label">类型</label>
-              <select name="post_type" className="form-select" value={form.post_type} onChange={handleChange} required>
-                <option value="lost">{LOST_FOUND_TYPE.lost}（丢失）</option>
-                <option value="found">{LOST_FOUND_TYPE.found}（发现）</option>
-              </select>
+            <div className="col-12">
+              <label className="form-label d-block">类型 <span className="text-danger">*</span></label>
+              <div className="btn-group w-100 flex-wrap" role="group">
+                {Object.entries(LOST_FOUND_TYPE).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`btn flex-fill ${form.post_type === key ? 'btn-success' : 'btn-outline-secondary'}`}
+                    onClick={() => setForm((f) => ({ ...f, post_type: key }))}
+                  >
+                    {label}
+                    <small className="d-block opacity-75">{key === 'lost' ? '宠物走失' : '发现流浪/招领'}</small>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="col-md-6">
               <label className="form-label">宠物种类</label>
@@ -558,7 +570,7 @@ const LostFoundPublish = () => {
               <input type="tel" name="contact_phone" className="form-control" value={form.contact_phone} onChange={handleChange} placeholder="可选" />
             </div>
             <div className="col-12">
-              <label className="form-label">照片</label>
+              <label className="form-label">照片 <span className="text-danger">*</span> <small className="text-muted">(至少 1 张)</small></label>
               <input type="file" className="form-control" accept="image/*" multiple onChange={handlePhotoUpload} disabled={uploading} />
               {uploading && <small className="text-muted">上传中...</small>}
               {photoUrls.length > 0 && (
@@ -574,11 +586,14 @@ const LostFoundPublish = () => {
             </div>
           </div>
         </div>
-        <div className="card-footer d-flex gap-2">
+        <div className="card-footer">
+          {photoError && <div className="alert alert-danger py-2 mb-2">{photoError}</div>}
+          <div className="d-flex gap-2">
           <button type="submit" className="btn btn-success" disabled={submitting || uploading}>
             {submitting ? '提交中...' : '发布'}
           </button>
           <Link to="/lost-found" className="btn btn-outline-secondary">取消</Link>
+          </div>
         </div>
       </form>
     </div>

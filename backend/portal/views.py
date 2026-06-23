@@ -8,7 +8,7 @@ from .serializers import PortalCarouselSerializer
 
 
 class PortalCarouselViewSet(viewsets.ModelViewSet):
-    """轮播图管理"""
+    """\u9996\u9875\u8f6e\u64ad\u56fe\u7ba1\u7406"""
     queryset = PortalCarousel.objects.all()
     serializer_class = PortalCarouselSerializer
 
@@ -17,16 +17,25 @@ class PortalCarouselViewSet(viewsets.ModelViewSet):
             return [permissions.AllowAny()]
         return [IsAdminRole()]
 
+    def get_authenticators(self):
+        if getattr(self, 'action', None) in ['list', 'retrieve']:
+            return []
+        return super().get_authenticators()
+
     def get_queryset(self):
         qs = super().get_queryset()
-        if self.action == 'list' and not (self.request.user.is_authenticated and getattr(self.request.user.profile, 'role', None) == 'admin'):
+        if self.action == 'list' and not (
+            self.request.user.is_authenticated
+            and getattr(getattr(self.request.user, 'profile', None), 'role', None) == 'admin'
+        ):
             qs = qs.filter(status=1)
         return qs
 
 
 class PortalStatsView(APIView):
-    """首页核心数据统计"""
-    permission_classes = [permissions.AllowAny()]
+    """\u9996\u9875\u6838\u5fc3\u6570\u636e\u7edf\u8ba1"""
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         from django.utils import timezone
@@ -44,8 +53,9 @@ class PortalStatsView(APIView):
 
 
 class PortalDashboardView(APIView):
-    """首页最新动态聚合"""
-    permission_classes = [permissions.AllowAny()]
+    """\u9996\u9875\u6700\u65b0\u52a8\u6001\u805a\u5408"""
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request):
         from cms.models import CmsArticle
@@ -75,6 +85,6 @@ class PortalDashboardView(APIView):
         return Response({
             'announcements': CmsArticleSerializer(announcements, many=True, context=ctx).data,
             'science_articles': CmsArticleSerializer(science_articles, many=True, context=ctx).data,
-            'urgent_lost': LostFoundPostSerializer(urgent_lost, many=True).data,
-            'adoptable_pets': PetProfileSerializer(adoptable_pets, many=True).data,
+            'urgent_lost': LostFoundPostSerializer(urgent_lost, many=True, context=ctx).data,
+            'adoptable_pets': PetProfileSerializer(adoptable_pets, many=True, context=ctx).data,
         })

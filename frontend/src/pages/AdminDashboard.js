@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { adoptAPI, adminAPI, cmsAPI, petsAPI } from '../api/api';
+import CarouselAdminPanel from '../components/CarouselAdminPanel';
+import CmsMarkdownEditor from '../components/CmsMarkdownEditor';
 import { SITE_NAME, ADOPTION_STATUS, ONLINE_STATUS, ARTICLE_TYPES } from '../constants/site';
+import getQuestionnaireEntries, { formatAttachmentType } from '../utils/adoptQuestionnaireDisplay';
 
 const SPECIES_LABELS = {
   dog: '狗',
@@ -22,13 +25,29 @@ const MODERATION_ACTION_LABELS = {
   approve: '通过',
   hide: '隐藏',
   delete: '删除',
+  ban: '封禁',
 };
 
 const CONTENT_TYPE_OPTIONS = [
   { value: 'community_post', label: '社区帖子' },
   { value: 'cms_article', label: '资讯文章' },
   { value: 'lost_found_post', label: '报失寻主' },
+  { value: 'user', label: '用户' },
 ];
+
+const CONFIG_LABELS = {
+  max_upload_mb: '最大上传文件大小（MB）',
+  ai_daily_limit: '每日最大 AI 调用次数',
+  ai_total_limit: 'AI 总调用次数上限',
+};
+
+const FEATURE_TYPE_LABELS = {
+  breed_detect: '品种识别',
+  adopt_copy: '领养文案',
+  qa_assistant: '智能问答',
+};
+
+const AI_LOG_PAGE_SIZE = 20;
 
 const toList = (data) => (Array.isArray(data) ? data : data?.results ?? []);
 
@@ -45,7 +64,8 @@ const TABS = [
   { key: 'adopt', label: '领养审核', icon: 'fa-clipboard-check' },
   { key: 'pets', label: '宠物管理', icon: 'fa-paw' },
   { key: 'cms', label: '资讯管理', icon: 'fa-newspaper' },
-  { key: 'moderation', label: '内容审核', icon: 'fa-shield-alt' },
+  { key: 'moderation', label: '处置记录', icon: 'fa-shield-alt' },
+  { key: 'carousel', label: '首页轮播', icon: 'fa-images' },
   { key: 'config', label: '系统配置', icon: 'fa-cog' },
   { key: 'ai-logs', label: 'AI 日志', icon: 'fa-robot' },
 ];
@@ -78,18 +98,31 @@ const AdminDashboard = () => {
   const [moderation, setModeration] = useState([]);
   const [configs, setConfigs] = useState([]);
   const [aiLogs, setAiLogs] = useState([]);
+  const [aiLogPage, setAiLogPage] = useState(1);
+  const [aiLogTotal, setAiLogTotal] = useState(0);
+  const [aiLogStats, setAiLogStats] = useState(null);
 
   const [auditForm, setAuditForm] = useState({});
-  const [modForm, setModForm] = useState({ content_type: 'community_post', content_id: '', action: 'hide', reason: '' });
+  const [modFilter, setModFilter] = useState({ content_type: '', action: '' });
   const [configEdits, setConfigEdits] = useState({});
   const [articleForm, setArticleForm] = useState(emptyArticleForm());
   const [editingArticleId, setEditingArticleId] = useState(null);
   const [showArticleForm, setShowArticleForm] = useState(false);
+  const [reviewDetail, setReviewDetail] = useState(null);
+  const [reviewLoadingId, setReviewLoadingId] = useState(null);
 
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && TABS.some((t) => t.key === tab)) setActiveTab(tab);
   }, [searchParams]);
+
+  const loadAiLogsData = useCallback(async (page) => {
+    const res = await adminAPI.getAiLogs({ page, page_size: AI_LOG_PAGE_SIZE });
+    setAiLogs(toList(res.data));
+    setAiLogTotal(res.data?.count ?? 0);
+    const statsRes = await adminAPI.getAiLogStats();
+    setAiLogStats(statsRes.data);
+  }, []);
 
   const loadTabData = useCallback(async (tab) => {
     setLoading(true);
@@ -133,11 +166,12 @@ const AdminDashboard = () => {
           const edits = {};
           list.forEach((c) => { edits[c.config_key] = c.config_value; });
           setConfigEdits(edits);
-          break;
-        }
-        case 'ai-logs': {
-          const res = await adminAPI.getAiLogs();
-          setAiLogs(toList(res.data));
+          try {
+            const statsRes = await adminAPI.getAiLogStats();
+            setAiLogStats(statsRes.data);
+          } catch {
+            /* optional stats */
+          }
           break;
         }
         default:
@@ -155,8 +189,20 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'ai-logs') {
+      setLoading(true);
+      setError(null);
+      loadAiLogsData(aiLogPage)
+        .catch((err) => {
+          const msg = getApiError(err);
+          setError(`加载失败：${msg}`);
+          console.error(err);
+        })
+        .finally(() => setLoading(false));
+      return;
+    }
     loadTabData(activeTab);
-  }, [activeTab, loadTabData]);
+  }, [activeTab, aiLogPage, loadTabData, loadAiLogsData]);
 
   const handleUserUpdate = async (userId, data) => {
     try {
@@ -168,28 +214,41 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleAudit = async (appId) => {
-    const form = auditForm[appId] || { online_status: 'approved', audit_opinion: '' };
+  const loadReviewDetail = async (appId) => {
+    if (reviewDetail?.id === appId) {
+      setReviewDetail(null);
+      return;
+    }
+    setReviewLoadingId(appId);
     try {
-      await adoptAPI.audit(appId, form);
-      loadTabData('adopt');
+      const res = await adoptAPI.getReviewDetail(appId);
+      setReviewDetail(res.data);
     } catch (err) {
-      alert('审核失败');
+      alert(getApiError(err) || '加载申请详情失败');
       console.error(err);
+    } finally {
+      setReviewLoadingId(null);
     }
   };
 
-  const handleModerationCreate = async (e) => {
-    e.preventDefault();
+  const getAuditFormForApp = (appId) => ({
+    online_status: 'approved',
+    audit_opinion: '',
+    ...(auditForm[appId] || {}),
+  });
+
+  const handleAudit = async (appId) => {
+    const form = getAuditFormForApp(appId);
+    if (!form.online_status) {
+      alert('请选择审核结果');
+      return;
+    }
     try {
-      await adminAPI.createModeration({
-        ...modForm,
-        content_id: parseInt(modForm.content_id, 10),
-      });
-      setModForm({ content_type: '', content_id: '', action: 'hide', reason: '' });
-      loadTabData('moderation');
+      await adoptAPI.audit(appId, form);
+      setReviewDetail(null);
+      loadTabData('adopt');
     } catch (err) {
-      alert('创建审核记录失败');
+      alert(getApiError(err) || '审核失败');
       console.error(err);
     }
   };
@@ -267,9 +326,17 @@ const AdminDashboard = () => {
   };
 
   const switchTab = (key) => {
+    if (key === 'ai-logs') setAiLogPage(1);
     setActiveTab(key);
     setSearchParams({ tab: key });
   };
+
+  const formatLimit = (used, limit) => {
+    if (!limit || limit <= 0) return `${used} / 不限制`;
+    return `${used} / ${limit}`;
+  };
+
+  const aiLogTotalPages = Math.max(1, Math.ceil(aiLogTotal / AI_LOG_PAGE_SIZE));
 
   const renderDashboard = () => (
     <div>
@@ -321,11 +388,11 @@ const AdminDashboard = () => {
               <td>{user.username}</td>
               <td>{user.email}</td>
               <td>{ROLE_LABELS[user.profile?.role] || user.profile?.role || '-'}</td>
-              <td>{user.profile?.status === 1 ? '正常' : '禁用'}</td>
+              <td>{user.profile?.status === 1 ? '已封禁' : '正常'}</td>
               <td>
                 <div className="btn-group btn-group-sm">
-                  <button type="button" className="btn btn-outline-success" onClick={() => handleUserUpdate(user.id, { status: 1 })}>启用</button>
-                  <button type="button" className="btn btn-outline-danger" onClick={() => handleUserUpdate(user.id, { status: 0 })}>禁用</button>
+                  <button type="button" className="btn btn-outline-success" disabled={user.profile?.status !== 1} onClick={() => handleUserUpdate(user.id, { status: 0 })}>解封</button>
+                  <button type="button" className="btn btn-outline-danger" disabled={user.profile?.status === 1} onClick={() => handleUserUpdate(user.id, { status: 1 })}>封禁</button>
                   <button type="button" className="btn btn-outline-primary" onClick={() => handleUserUpdate(user.id, { role: 'admin' })}>设为管理员</button>
                 </div>
               </td>
@@ -336,54 +403,132 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const renderQuestionnairePreview = (answers) => {
+    const entries = getQuestionnaireEntries(answers);
+    if (!entries.length) return <span className="text-muted">无问卷数据</span>;
+    return (
+      <dl className="row mb-0 small">
+        {entries.map(({ key, label, value }) => (
+          <React.Fragment key={key}>
+            <dt className="col-sm-4 text-muted">{label}</dt>
+            <dd className="col-sm-8">{value}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    );
+  };
+
   const renderAdoptAudit = () => (
-    <div className="table-responsive">
-      <table className="table table-hover">
-        <thead>
-          <tr>
-            <th>申请人</th>
-            <th>宠物</th>
-            <th>留言</th>
-            <th>状态</th>
-            <th>审核</th>
-          </tr>
-        </thead>
-        <tbody>
-          {applications.map((app) => (
-            <tr key={app.id}>
-              <td>{app.applicant?.username}</td>
-              <td>{app.pet?.name || app.pet_id}</td>
-              <td style={{ maxWidth: 150 }}>{app.message}</td>
-              <td><span className="badge bg-secondary">{ONLINE_STATUS[app.online_status] || app.online_status}</span></td>
-              <td>
-                {app.online_status === 'pending' ? (
-                  <div className="d-flex flex-column gap-1" style={{ minWidth: 200 }}>
-                    <select
-                      className="form-select form-select-sm"
-                      value={auditForm[app.id]?.online_status || 'approved'}
-                      onChange={(e) => setAuditForm({ ...auditForm, [app.id]: { ...auditForm[app.id], online_status: e.target.value } })}
+    <div>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <p className="text-muted small mb-0">共 {applications.length} 条申请，点击「查看详情」可查看问卷与附件。</p>
+        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => loadTabData('adopt')}>
+          <i className="fas fa-redo me-1"></i>刷新
+        </button>
+      </div>
+      {applications.length === 0 ? (
+        <div className="alert alert-light text-center mb-0">暂无领养申请记录</div>
+      ) : (
+        <div className="table-responsive">
+          <table className="table table-hover align-middle">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>申请人</th>
+                <th>宠物</th>
+                <th>留言</th>
+                <th>材料</th>
+                <th>状态</th>
+                <th>申请时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {applications.map((app) => (
+                <tr key={app.id}>
+                  <td>{app.id}</td>
+                  <td>{app.applicant?.username}</td>
+                  <td>{app.pet?.name || app.pet_id}</td>
+                  <td style={{ maxWidth: 140 }} className="text-truncate" title={app.message}>{app.message || '-'}</td>
+                  <td>
+                    {app.has_questionnaire ? <span className="badge bg-info text-dark me-1">问卷</span> : null}
+                    {(app.attachment_count || 0) > 0 ? <span className="badge bg-secondary">附件 {app.attachment_count}</span> : null}
+                    {!app.has_questionnaire && !(app.attachment_count > 0) ? <span className="text-muted small">待补充</span> : null}
+                  </td>
+                  <td><span className="badge bg-secondary">{ONLINE_STATUS[app.online_status] || app.online_status}</span></td>
+                  <td><small>{app.created_at ? new Date(app.created_at).toLocaleString() : '-'}</small></td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary btn-sm mb-1"
+                      onClick={() => loadReviewDetail(app.id)}
+                      disabled={reviewLoadingId === app.id}
                     >
-                      <option value="approved">通过</option>
-                      <option value="rejected">拒绝</option>
-                      <option value="need_material">需补材料</option>
-                    </select>
-                    <input
-                      type="text"
-                      className="form-control form-control-sm"
-                      placeholder="审核意见"
-                      value={auditForm[app.id]?.audit_opinion || ''}
-                      onChange={(e) => setAuditForm({ ...auditForm, [app.id]: { ...auditForm[app.id], audit_opinion: e.target.value } })}
-                    />
-                    <button type="button" className="btn btn-success btn-sm" onClick={() => handleAudit(app.id)}>提交审核</button>
-                  </div>
-                ) : (
-                  <small className="text-muted">{app.audit_opinion || '已审核'}</small>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                      {reviewLoadingId === app.id ? '加载中...' : (reviewDetail?.id === app.id ? '收起详情' : '查看详情')}
+                    </button>
+                    {app.online_status === 'pending' ? (
+                      <div className="d-flex flex-column gap-1 mt-1" style={{ minWidth: 200 }}>
+                        <select
+                          className="form-select form-select-sm"
+                          value={getAuditFormForApp(app.id).online_status}
+                          onChange={(e) => setAuditForm({
+                            ...auditForm,
+                            [app.id]: { ...getAuditFormForApp(app.id), online_status: e.target.value },
+                          })}
+                        >
+                          <option value="approved">通过</option>
+                          <option value="rejected">拒绝</option>
+                          <option value="need_material">需补材料</option>
+                        </select>
+                        <input
+                          type="text"
+                          className="form-control form-control-sm"
+                          placeholder="审核意见"
+                          value={getAuditFormForApp(app.id).audit_opinion}
+                          onChange={(e) => setAuditForm({
+                            ...auditForm,
+                            [app.id]: { ...getAuditFormForApp(app.id), audit_opinion: e.target.value },
+                          })}
+                        />
+                        <button type="button" className="btn btn-success btn-sm" onClick={() => handleAudit(app.id)}>提交审核</button>
+                      </div>
+                    ) : (
+                      <small className="text-muted d-block">{app.audit_opinion || '已审核'}</small>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {reviewDetail && (
+        <div className="card mt-3 border-primary">
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <span>申请 #{reviewDetail.id} 详情</span>
+            <button type="button" className="btn-close" aria-label="关闭" onClick={() => setReviewDetail(null)} />
+          </div>
+          <div className="card-body">
+            <p className="mb-2"><strong>申请人：</strong>{reviewDetail.applicant?.username} {reviewDetail.applicant_phone_masked ? `（${reviewDetail.applicant_phone_masked}）` : ''}</p>
+            <p className="mb-2"><strong>宠物：</strong>{reviewDetail.pet?.name || '-'}</p>
+            <p className="mb-3"><strong>留言：</strong>{reviewDetail.message || '-'}</p>
+            <h6>问卷回答</h6>
+            <div className="mb-3">{renderQuestionnairePreview(reviewDetail.questionnaire)}</div>
+            <h6>附件</h6>
+            {reviewDetail.attachments?.length ? (
+              <ul className="list-unstyled mb-0">
+                {reviewDetail.attachments.map((att) => (
+                  <li key={att.id} className="mb-1">
+                    <a href={att.file_url} target="_blank" rel="noopener noreferrer">{formatAttachmentType(att.file_type)}</a>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted small mb-0">暂无附件</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -396,13 +541,13 @@ const AdminDashboard = () => {
         {pets.map((pet) => (
           <div key={pet.id} className="col-md-4 mb-3">
             <div className="card h-100">
-              <div className="card-body">
+              <div className="card-body text-center">
                 <h6>{pet.name || SPECIES_LABELS[pet.species] || pet.species}</h6>
                 <small className="text-muted d-block mb-2">
                   {SPECIES_LABELS[pet.species] || pet.species} · {ADOPTION_STATUS[pet.adoption_status] || pet.adoption_status}
                   <br />公开：{pet.is_public ? '是' : '否'}
                 </small>
-                <div className="d-flex flex-wrap gap-1">
+                <div className="d-flex flex-wrap gap-1 justify-content-center">
                   <Link to={`/pets/${pet.id}`} className="btn btn-outline-secondary btn-sm">前台</Link>
                   <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => handlePetPatch(pet.id, { is_public: !pet.is_public })}>
                     {pet.is_public ? '隐藏' : '公开'}
@@ -438,7 +583,7 @@ const AdminDashboard = () => {
               </select>
             </div>
             <div className="col-12"><input className="form-control" placeholder="摘要" value={articleForm.summary} onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })} /></div>
-            <div className="col-12"><textarea className="form-control" rows={4} placeholder="正文" value={articleForm.content} onChange={(e) => setArticleForm({ ...articleForm, content: e.target.value })} required /></div>
+            <CmsMarkdownEditor value={articleForm.content} onChange={(v) => setArticleForm({ ...articleForm, content: v })} />
             <div className="col-12">
               <button type="submit" className="btn btn-primary btn-sm me-2">保存</button>
               <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setShowArticleForm(false)}>取消</button>
@@ -472,57 +617,68 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const filteredModeration = moderation.filter((item) => {
+    if (modFilter.content_type && item.content_type !== modFilter.content_type) return false;
+    if (modFilter.action && item.action !== modFilter.action) return false;
+    return true;
+  });
+
   const renderModeration = () => (
     <div>
-      <form onSubmit={handleModerationCreate} className="card mb-4">
-        <div className="card-header">新建审核操作</div>
-        <div className="card-body row g-2">
-          <div className="col-md-3">
-            <select className="form-select" value={modForm.content_type} onChange={(e) => setModForm({ ...modForm, content_type: e.target.value })} required>
-              {CONTENT_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <div className="col-md-2">
-            <input type="number" className="form-control" placeholder="内容 ID" value={modForm.content_id} onChange={(e) => setModForm({ ...modForm, content_id: e.target.value })} required />
-          </div>
-          <div className="col-md-2">
-            <select className="form-select" value={modForm.action} onChange={(e) => setModForm({ ...modForm, action: e.target.value })}>
-              {Object.entries(MODERATION_ACTION_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="col-md-3">
-            <input type="text" className="form-control" placeholder="原因" value={modForm.reason} onChange={(e) => setModForm({ ...modForm, reason: e.target.value })} />
-          </div>
-          <div className="col-md-2">
-            <button type="submit" className="btn btn-success w-100">提交</button>
-          </div>
+      <div className="row g-2 mb-3">
+        <div className="col-md-4">
+          <select
+            className="form-select form-select-sm"
+            value={modFilter.content_type}
+            onChange={(e) => setModFilter({ ...modFilter, content_type: e.target.value })}
+          >
+            <option value="">全部内容类型</option>
+            {CONTENT_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
-      </form>
+        <div className="col-md-4">
+          <select
+            className="form-select form-select-sm"
+            value={modFilter.action}
+            onChange={(e) => setModFilter({ ...modFilter, action: e.target.value })}
+          >
+            <option value="">全部操作</option>
+            {Object.entries(MODERATION_ACTION_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <p className="text-muted small">处置记录由前台管理模式自动写入，此处仅可查看。</p>
       <div className="table-responsive">
         <table className="table table-hover">
           <thead>
             <tr>
-              <th>类型</th>
-              <th>ID</th>
+              <th>时间</th>
+              <th>操作人</th>
+              <th>内容类型</th>
+              <th>目标</th>
               <th>操作</th>
               <th>原因</th>
-              <th>操作人</th>
-              <th>时间</th>
             </tr>
           </thead>
           <tbody>
-            {moderation.map((item) => (
+            {filteredModeration.map((item) => (
               <tr key={item.id}>
-                <td>{item.content_type}</td>
-                <td>{item.content_id}</td>
-                <td><span className="badge bg-warning text-dark">{MODERATION_ACTION_LABELS[item.action] || item.action}</span></td>
-                <td>{item.reason}</td>
-                <td>{item.operator?.username}</td>
                 <td>{new Date(item.created_at).toLocaleString()}</td>
+                <td>{item.operator?.username || '-'}</td>
+                <td>{CONTENT_TYPE_OPTIONS.find((o) => o.value === item.content_type)?.label || item.content_type}</td>
+                <td>
+                  #{item.content_id}
+                  {item.target_summary ? <small className="text-muted d-block">{item.target_summary}</small> : null}
+                </td>
+                <td><span className="badge bg-warning text-dark">{MODERATION_ACTION_LABELS[item.action] || item.action}</span></td>
+                <td>{item.reason || '-'}</td>
               </tr>
             ))}
+            {filteredModeration.length === 0 && (
+              <tr><td colSpan={6} className="text-muted text-center">暂无处置记录</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -530,55 +686,100 @@ const AdminDashboard = () => {
   );
 
   const renderConfig = () => (
-    <div className="list-group">
-      {configs.map((cfg) => (
-        <div key={cfg.config_key} className="list-group-item">
-          <div className="d-flex justify-content-between align-items-start mb-2">
-            <div>
-              <strong>{cfg.config_key}</strong>
-              {cfg.description && <small className="text-muted d-block">{cfg.description}</small>}
-            </div>
-          </div>
-          <div className="input-group">
-            <input
-              type="text"
-              className="form-control"
-              value={configEdits[cfg.config_key] ?? ''}
-              onChange={(e) => setConfigEdits({ ...configEdits, [cfg.config_key]: e.target.value })}
-            />
-            <button type="button" className="btn btn-success" onClick={() => handleConfigSave(cfg.config_key)}>保存</button>
-          </div>
+    <div>
+      {aiLogStats && (
+        <div className="alert alert-secondary py-2 small mb-3">
+          <strong>AI 调用用量：</strong>
+          今日 {formatLimit(aiLogStats.today_count, aiLogStats.daily_limit)}
+          {' · '}
+          累计 {formatLimit(aiLogStats.total_count, aiLogStats.total_limit)}
+          <span className="text-muted ms-2">（0 表示不限制，可在下方配置）</span>
         </div>
-      ))}
+      )}
+      <div className="list-group">
+        {configs.map((cfg) => {
+          const isNumeric = cfg.config_key.endsWith('_limit') || cfg.config_key.endsWith('_mb');
+          return (
+            <div key={cfg.config_key} className="list-group-item">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <strong>{CONFIG_LABELS[cfg.config_key] || cfg.config_key}</strong>
+                  <small className="text-muted d-block">{cfg.config_key}</small>
+                  {cfg.description && <small className="text-muted d-block">{cfg.description}</small>}
+                </div>
+              </div>
+              <div className="input-group">
+                <input
+                  type={isNumeric ? 'number' : 'text'}
+                  min={isNumeric ? '0' : undefined}
+                  className="form-control"
+                  value={configEdits[cfg.config_key] ?? ''}
+                  onChange={(e) => setConfigEdits({ ...configEdits, [cfg.config_key]: e.target.value })}
+                />
+                <button type="button" className="btn btn-success" onClick={() => handleConfigSave(cfg.config_key)}>保存</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 
   const renderAiLogs = () => (
-    <div className="table-responsive">
-      <table className="table table-hover table-sm">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>用户</th>
-            <th>功能</th>
-            <th>成功</th>
-            <th>请求</th>
-            <th>时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          {aiLogs.map((log) => (
-            <tr key={log.id}>
-              <td>{log.id}</td>
-              <td>{log.user?.username || log.user}</td>
-              <td>{log.feature_type}</td>
-              <td>{log.success ? '是' : '否'}</td>
-              <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{log.request_meta}</td>
-              <td>{new Date(log.created_at).toLocaleString()}</td>
+    <div>
+      <div className="alert alert-info small">
+        AI 日志用于审计平台三大 AI 功能：<strong>品种识别</strong>、<strong>领养文案生成</strong>、<strong>智能养宠问答</strong>。
+        记录调用用户、成功与否、请求摘要与时间，便于排查故障与统计用量。限额在「系统配置」中设置。
+      </div>
+      {aiLogStats && (
+        <p className="text-muted small mb-3">
+          今日用量 {formatLimit(aiLogStats.today_count, aiLogStats.daily_limit)}
+          {' · '}
+          累计用量 {formatLimit(aiLogStats.total_count, aiLogStats.total_limit)}
+        </p>
+      )}
+      <div className="table-responsive">
+        <table className="table table-hover table-sm">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户</th>
+              <th>功能</th>
+              <th>成功</th>
+              <th>请求</th>
+              <th>时间</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {aiLogs.map((log) => (
+              <tr key={log.id}>
+                <td>{log.id}</td>
+                <td>{log.user?.username || log.user}</td>
+                <td>{FEATURE_TYPE_LABELS[log.feature_type] || log.feature_type}</td>
+                <td>{log.success ? '是' : '否'}</td>
+                <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={log.request_meta}>{log.request_meta}</td>
+                <td>{new Date(log.created_at).toLocaleString()}</td>
+              </tr>
+            ))}
+            {aiLogs.length === 0 && (
+              <tr><td colSpan={6} className="text-muted text-center">暂无 AI 调用记录</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {aiLogTotalPages > 1 && (
+        <nav className="d-flex justify-content-between align-items-center mt-3">
+          <small className="text-muted">共 {aiLogTotal} 条，第 {aiLogPage} / {aiLogTotalPages} 页</small>
+          <ul className="pagination pagination-sm mb-0">
+            <li className={`page-item${aiLogPage <= 1 ? ' disabled' : ''}`}>
+              <button type="button" className="page-link" onClick={() => setAiLogPage((p) => Math.max(1, p - 1))}>上一页</button>
+            </li>
+            <li className={`page-item${aiLogPage >= aiLogTotalPages ? ' disabled' : ''}`}>
+              <button type="button" className="page-link" onClick={() => setAiLogPage((p) => Math.min(aiLogTotalPages, p + 1))}>下一页</button>
+            </li>
+          </ul>
+        </nav>
+      )}
     </div>
   );
 
@@ -590,6 +791,7 @@ const AdminDashboard = () => {
       case 'pets': return renderPets();
       case 'cms': return renderCms();
       case 'moderation': return renderModeration();
+      case 'carousel': return <CarouselAdminPanel />;
       case 'config': return renderConfig();
       case 'ai-logs': return renderAiLogs();
       default: return null;

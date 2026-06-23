@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cmsAPI } from '../api/api';
 import { ARTICLE_TYPES } from '../constants/site';
 
@@ -108,8 +110,8 @@ const CmsDetail = () => {
             )}
           </div>
           {article.summary && <p className="lead text-muted">{article.summary}</p>}
-          <div className="article-content" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-            {article.content}
+          <div className="article-content markdown-preview" style={{ lineHeight: 1.8 }}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{article.content || ''}</ReactMarkdown>
           </div>
         </div>
       </article>

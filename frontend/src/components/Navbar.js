@@ -55,7 +55,7 @@ const Navbar = () => {
   };
 
   const L = {
-    home: '首页', pets: '领养宠物', cms: '科普公告', lost: '报失寻主', comm: '社区', rescue: '救助追踪',
+    home: '首页', pets: '领养宠物', cms: '科普公告', lost: '报失寻主', comm: '社区', rescue: '救助跟踪',
     add: '添加档案', dash: '我的领养', admin: '管理后台', profile: '个人中心', publicPage: '我的主页', editProfile: '编辑资料', my: '我的救助', out: '退出登录', login: '登录', reg: '注册', user: '用户', manage: '管理模式',
   };
 

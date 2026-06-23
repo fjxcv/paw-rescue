@@ -170,8 +170,7 @@ const Home = () => {
           <div className="text-center py-3">
             <span className="text-muted small">统计数据加载失败</span>
             <button className="btn btn-sm btn-outline-secondary ms-2" onClick={fetchStats}>
-              <i className="fas fa-redo me-1"></i>重试
-            </button>
+              <i className="fas fa-redo me-1"></i>重试</button>
           </div>
         ) : stats ? (
           <div className="row g-3 justify-content-center">
@@ -205,12 +204,11 @@ const Home = () => {
           <div className="text-center py-4">
             <span className="text-muted small">动态加载失败</span>
             <button className="btn btn-sm btn-outline-secondary ms-2" onClick={fetchDashboard}>
-              <i className="fas fa-redo me-1"></i>重新加载
-            </button>
+              <i className="fas fa-redo me-1"></i>重新加载</button>
           </div>
         ) : dashboard ? (
           <div className="row g-4">
-            {/* 紧急报失 */}
+            {/* 紧急寻主 */}
             <div className="col-md-4">
               <div className="card shadow-sm h-100">
                 <div className="card-header bg-danger text-white">
@@ -245,7 +243,7 @@ const Home = () => {
               </div>
             </div>
 
-            {/* 最新科普 */}
+            {/* 科普文章 */}
             <div className="col-md-4">
               <div className="card shadow-sm h-100">
                 <div className="card-header bg-success text-white">
@@ -364,7 +362,7 @@ const Home = () => {
               </div>
               <div className="col-md-5">
                 <label className="form-label small">文字描述（可选）</label>
-                <input className="form-control form-control-sm" value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="如：橘色短毛、绿眼睛" />
+                <input className="form-control form-control-sm" value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="如：橙色短毛、绿眼睛" />
               </div>
               <div className="col-md-3">
                 <button type="button" className="btn btn-success w-100" disabled={aiLoading} onClick={async () => {

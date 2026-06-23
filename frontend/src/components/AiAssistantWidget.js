@@ -4,10 +4,28 @@ import './AiAssistantWidget.css';
 
 const DRAG_THRESHOLD_PX = 8;
 
+const T = {
+  welcome: '\u4f60\u597d\uff0c\u6211\u662f\u6696\u722a\u667a\u80fd\u517b\u5ba0\u52a9\u624b\uff0c\u6709\u4ec0\u4e48\u517b\u5ba0\u95ee\u9898\u53ef\u4ee5\u95ee\u6211\u3002',
+  loginFirst: '\u8bf7\u5148\u767b\u5f55\u540e\u518d\u4f7f\u7528\u667a\u80fd\u52a9\u624b',
+  title: '\u667a\u80fd\u517b\u5ba0\u52a9\u624b',
+  dragTitle: '\u62d6\u52a8\u4f4d\u7f6e',
+  dragAria: '\u62d6\u52a8\u52a9\u624b\u4f4d\u7f6e',
+  close: '\u5173\u95ed',
+  disclaimer: 'AI \u56de\u7b54\u4ec5\u4f9b\u53c2\u8003\uff0c\u4e0d\u80fd\u66ff\u4ee3\u517d\u533b\u8bca\u65ad\uff1b\u5ba0\u7269\u4e0d\u9002\u6216\u751f\u75c5\u8bf7\u5c3d\u5feb\u5c31\u533b\u3002',
+  thinking: '\u601d\u8003\u4e2d...',
+  placeholder: '\u8f93\u5165\u517b\u5ba0\u95ee\u9898...',
+  send: '\u53d1\u9001',
+  fabTitle: '\u667a\u80fd\u517b\u5ba0\u52a9\u624b\uff08\u62d6\u52a8\u53ef\u79fb\u52a8\u4f4d\u7f6e\uff0c\u70b9\u51fb\u6253\u5f00\uff09',
+  quotaExceeded: '\u4eca\u65e5\u6216\u7d2f\u8ba1 AI \u8c03\u7528\u5df2\u8fbe\u4e0a\u9650\uff0c\u8bf7\u8054\u7cfb\u7ba1\u7406\u5458',
+  llmNotConfigured: '\u672a\u914d\u7f6e LLM\uff0c\u8bf7\u8054\u7cfb\u7ba1\u7406\u5458',
+  timeout: '\u8bf7\u6c42\u8d85\u65f6\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5',
+  genericFail: '\u8bf7\u6c42\u5931\u8d25\uff0c\u8bf7\u786e\u8ba4\u540e\u7aef\u5df2\u542f\u52a8\u4e14 LLM \u5df2\u914d\u7f6e',
+};
+
 const AiAssistantWidget = () => {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: '你好，我是暖爪智能养宠助手，有什么养宠问题可以问我。' },
+    { role: 'assistant', content: T.welcome },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -109,11 +127,23 @@ const AiAssistantWidget = () => {
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
+  const formatAiError = (err) => {
+    const status = err.response?.status;
+    let detail = err.response?.data?.detail || '';
+    if (typeof detail !== 'string') detail = String(detail || '');
+    if (status === 401) return T.loginFirst;
+    if (status === 429) return detail || T.quotaExceeded;
+    if (status === 503) return detail || T.llmNotConfigured;
+    if (err.code === 'ECONNABORTED') return T.timeout;
+    if (detail) return detail;
+    return T.genericFail;
+  };
+
   const send = async () => {
     const q = input.trim();
     if (!q || loading) return;
     if (!localStorage.getItem('token')) {
-      alert('请先登录后使用智能助手');
+      alert(T.loginFirst);
       return;
     }
     const nextMsgs = [...messages, { role: 'user', content: q }];
@@ -125,13 +155,7 @@ const AiAssistantWidget = () => {
       const res = await aiAPI.qa({ question: q, history });
       setMessages((m) => [...m, { role: 'assistant', content: res.data.answer }]);
     } catch (err) {
-      let detail = err.response?.data?.detail || '';
-      if (err.code === 'ECONNABORTED') {
-        detail = '请求超时，请稍后重试';
-      } else if (!detail) {
-        detail = '请求失败，请确认后端已启动且 LLM 已配置';
-      }
-      setMessages((m) => [...m, { role: 'assistant', content: detail }]);
+      setMessages((m) => [...m, { role: 'assistant', content: formatAiError(err) }]);
     } finally {
       setLoading(false);
     }
@@ -148,26 +172,24 @@ const AiAssistantWidget = () => {
             <button
               type="button"
               className="ai-drag-handle btn btn-sm btn-light border"
-              title="拖动位置"
-              aria-label="拖动助手位置"
+              title={T.dragTitle}
+              aria-label={T.dragAria}
               onPointerDown={onDragHandleDown}
             >
               <i className="fas fa-grip-lines" />
             </button>
-            <span className="fw-semibold small flex-grow-1 text-center">智能养宠助手</span>
-            <button type="button" className="btn-close btn-sm" aria-label="关闭" onClick={() => setOpen(false)} />
+            <span className="fw-semibold small flex-grow-1 text-center">{T.title}</span>
+            <button type="button" className="btn-close btn-sm" aria-label={T.close} onClick={() => setOpen(false)} />
           </div>
           <div className="ai-disclaimer" role="note">
             <i className="fas fa-exclamation-triangle text-warning" aria-hidden />
-            <span>
-              AI 回答仅供参考，不能替代兽医诊断；宠物不适或生病请尽快就医。
-            </span>
+            <span>{T.disclaimer}</span>
           </div>
           <div className="ai-panel-messages">
             {messages.map((m, i) => (
               <div key={i} className={`ai-msg ai-msg-${m.role}`}>{m.content}</div>
             ))}
-            {loading && <div className="text-muted small">思考中...</div>}
+            {loading && <div className="text-muted small">{T.thinking}</div>}
           </div>
           <div className="card-footer p-2">
             <div className="input-group input-group-sm">
@@ -176,9 +198,9 @@ const AiAssistantWidget = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && send()}
-                placeholder="输入养宠问题..."
+                placeholder={T.placeholder}
               />
-              <button type="button" className="btn btn-success" onClick={send} disabled={loading}>发送</button>
+              <button type="button" className="btn btn-success" onClick={send} disabled={loading}>{T.send}</button>
             </div>
           </div>
         </div>
@@ -187,7 +209,7 @@ const AiAssistantWidget = () => {
         type="button"
         className={`ai-fab btn btn-success rounded-circle shadow${fabDragging ? ' ai-fab-dragging' : ''}`}
         onPointerDown={onFabPointerDown}
-        title="智能养宠助手（拖动可移动位置，点击打开）"
+        title={T.fabTitle}
         aria-expanded={open}
       >
         <i className="fas fa-robot" />

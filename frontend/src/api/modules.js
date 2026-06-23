@@ -2,6 +2,9 @@ import api from './index';
 
 export const portalAPI = {
   getCarousel: () => api.get('/portal/carousel/'),
+  createCarousel: (data) => api.post('/portal/carousel/', data),
+  updateCarousel: (id, data) => api.patch(`/portal/carousel/${id}/`, data),
+  deleteCarousel: (id) => api.delete(`/portal/carousel/${id}/`),
   getStats: () => api.get('/portal/stats/'),
   getDashboard: () => api.get('/portal/dashboard/'),
 };
@@ -60,7 +63,8 @@ export const adminAPI = {
   createModeration: (data) => api.post('/admin/moderation/', data),
   getConfig: () => api.get('/admin/config/'),
   updateConfig: (key, data) => api.patch(`/admin/config/${key}/`, data),
-  getAiLogs: () => api.get('/admin/ai-logs/'),
+  getAiLogs: (params) => api.get('/admin/ai-logs/', { params }),
+  getAiLogStats: () => api.get('/admin/ai-logs/stats/'),
 };
 
 const AI_TIMEOUT_MS = 90000;

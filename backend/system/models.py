@@ -22,12 +22,14 @@ class ContentModeration(models.Model):
         ('approve', 'Approve'),
         ('hide', 'Hide'),
         ('delete', 'Delete'),
+        ('ban', 'Ban'),
     ]
 
     content_type = models.CharField(max_length=30)
     content_id = models.BigIntegerField()
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     reason = models.TextField(blank=True, null=True)
+    target_summary = models.CharField(max_length=200, blank=True, null=True)
     operator = models.ForeignKey(User, on_delete=models.RESTRICT, related_name='moderation_actions')
     created_at = models.DateTimeField(auto_now_add=True)
 

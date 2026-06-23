@@ -6,6 +6,6 @@ export const ARTICLE_TYPES = {science:'科普',announcement:'公告',law:'法规
 export const POST_CATEGORIES = {general:'综合',rescue_share:'救助分享',help_request:'求助',pet_experience:'养宠经验'};
 export const LOST_FOUND_TYPE = {lost:'寻宠',found:'招领'};
 export const LOST_FOUND_STATUS = {searching:'寻找中',found:'已找到',cancelled:'已取消'};
-export const RESCUE_STATUS = {pending_rescue:'待救助',in_medical:'医疗中',recovering:'康复中',awaiting_adoption:'待领养',rescued:'救助成功',abandoned:'已终止'};
+export const RESCUE_STATUS = {pending_rescue:'待救助',in_medical:'医疗中',recovering:'恢复中',awaiting_adoption:'待领养',rescued:'救助成功',abandoned:'已终止'};
 export const SIZE_CATEGORY = {small:'小型',medium:'中型',large:'大型'};
 export const HEALTH_STATUS = {healthy:'健康',minor_injury:'轻微伤病',severe_injury:'严重伤病'};
