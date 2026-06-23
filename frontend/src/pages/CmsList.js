@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { cmsAPI } from '../api/api';
 import AdminManageBar from '../components/AdminManageBar';
 import { ARTICLE_TYPES } from '../constants/site';
@@ -11,28 +11,67 @@ const TYPE_TABS = [
 
 const CmsList = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
-  const [activeType, setActiveType] = useState('');
+  const [activeType, setActiveType] = useState(searchParams.get('type') || '');
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const debounceRef = useRef(null);
+
+  // 加载文章列表
+  const fetchArticles = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = {};
+      if (activeType) params.type = activeType;
+      if (searchKeyword) params.search = searchKeyword;
+      const response = await cmsAPI.getArticles(params);
+      setArticles(Array.isArray(response.data) ? response.data : response.data?.results ?? []);
+    } catch (err) {
+      setError('加载文章失败，请稍后重试。');
+      console.error('Error fetching articles:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeType, searchKeyword]);
 
   useEffect(() => {
-    const fetchArticles = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const params = activeType ? { type: activeType } : {};
-        const response = await cmsAPI.getArticles(params);
-        setArticles(Array.isArray(response.data) ? response.data : response.data?.results ?? []);
-      } catch (err) {
-        setError('加载文章失败，请稍后重试。');
-        console.error('Error fetching articles:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchArticles();
-  }, [activeType]);
+  }, [fetchArticles]);
+
+  // 实时搜索：输入变化后延迟 300ms 自动搜索
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setSearchKeyword(value.trim());
+    }, 300);
+  };
+
+  // 搜索提交（点击按钮时立即搜索）
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchKeyword(searchInput.trim());
+  };
+
+  // 切换类型时重置搜索
+  const handleTypeChange = (type) => {
+    setActiveType(type);
+    setSearchKeyword('');
+    setSearchInput('');
+  };
+
+  // 组件卸载时清除定时器
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   return (
     <div className="py-3">
@@ -40,13 +79,14 @@ const CmsList = () => {
         <h2><i className="fas fa-newspaper me-2 text-success"></i>资讯中心</h2>
       </div>
 
-      <ul className="nav nav-pills mb-4 flex-wrap gap-1">
+      {/* 类型标签 */}
+      <ul className="nav nav-pills mb-3 flex-wrap gap-1">
         {TYPE_TABS.map((tab) => (
           <li className="nav-item" key={tab.key || 'all'}>
             <button
               type="button"
               className={`nav-link ${activeType === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveType(tab.key)}
+              onClick={() => handleTypeChange(tab.key)}
             >
               {tab.label}
             </button>
@@ -54,6 +94,25 @@ const CmsList = () => {
         ))}
       </ul>
 
+      {/* 搜索栏 */}
+      <div className="mb-4">
+        <form onSubmit={handleSearch}>
+          <div className="input-group" style={{ maxWidth: '400px' }}>
+            <input
+              type="text"
+              className="form-control"
+              placeholder="搜索文章关键词..."
+              value={searchInput}
+              onChange={handleInputChange}
+            />
+            <button type="submit" className="btn btn-success">
+              <i className="fas fa-search me-1"></i>搜索
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 文章列表 */}
       {loading && (
         <div className="text-center py-5">
           <div className="spinner-border text-success" role="status">
@@ -67,7 +126,9 @@ const CmsList = () => {
       {!loading && !error && (
         <div className="row">
           {articles.length === 0 ? (
-            <div className="col-12 text-center text-muted py-5">暂无文章</div>
+            <div className="col-12 text-center text-muted py-5">
+              {searchKeyword ? '未找到匹配的文章' : '暂无文章'}
+            </div>
           ) : (
             articles.map((article) => (
               <div key={article.id} className="col-md-6 col-lg-4 mb-4">

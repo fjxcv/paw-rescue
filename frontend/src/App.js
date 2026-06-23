@@ -19,10 +19,18 @@ import Login from './pages/Login';
 import LostFoundDetail from './pages/LostFoundDetail';
 import LostFoundList from './pages/LostFoundList';
 import LostFoundPublish from './pages/LostFoundPublish';
-import MyPets from './pages/MyPets';
+import ApplicationDetail from './pages/ApplicationDetail';
+import MyApplications from './pages/MyApplications';
+
+import AdoptApplication from './pages/AdoptApplication';
 import PetDetail from './pages/PetDetail';
 import PetList from './pages/PetList';
 import Register from './pages/Register';
+import MyRescues from './pages/MyRescues';
+import UpdateRescueStatus from './pages/UpdateRescueStatus';
+import StageRecord from './pages/StageRecord';
+import RescueSearch from './pages/RescueSearch';
+import RescueDetail from './pages/RescueDetail';
 import RescueList from './pages/RescueList';
 import RescueReport from './pages/RescueReport';
 import AccountCenter from './pages/AccountCenter';
@@ -47,6 +55,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/pets" element={<PetList />} />
               <Route path="/pets/:id" element={<PetDetail />} />
+              <Route path="/adopt/:petId" element={<ProtectedRoute><AdoptApplication /></ProtectedRoute>} />
               <Route path="/cms" element={<CmsList />} />
               <Route path="/cms/:id" element={<CmsDetail />} />
               <Route path="/lost-found" element={<LostFoundList />} />
@@ -56,15 +65,22 @@ function App() {
               <Route path="/community/publish" element={<ProtectedRoute><CommunityPublish /></ProtectedRoute>} />
               <Route path="/community/:id/edit" element={<ProtectedRoute><CommunityPostEdit /></ProtectedRoute>} />
               <Route path="/community/:id" element={<CommunityPostDetail />} />
-              <Route path="/rescue" element={<RescueList />} />
+              <Route path="/rescue" element={<ProtectedRoute><RescueList /></ProtectedRoute>} />
               <Route path="/rescue/report" element={<ProtectedRoute><RescueReport /></ProtectedRoute>} />
+              <Route path="/rescue/search" element={<ProtectedRoute><RescueSearch /></ProtectedRoute>} />
+              <Route path="/rescue/:id" element={<ProtectedRoute><RescueDetail /></ProtectedRoute>} />
+              <Route path="/my-rescues" element={<ProtectedRoute><MyRescues /></ProtectedRoute>} />
+              <Route path="/my-rescues/:id/update-status" element={<ProtectedRoute><UpdateRescueStatus /></ProtectedRoute>} />
+              <Route path="/my-rescues/:id/stage-record" element={<ProtectedRoute><StageRecord /></ProtectedRoute>} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
               <Route path="/users/:id" element={<UserPublicProfile />} />
               <Route path="/account" element={<ProtectedRoute><AccountCenter /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
-              <Route path="/my-pets" element={<ProtectedRoute><MyPets /></ProtectedRoute>} />
+
+              <Route path="/my-applications" element={<ProtectedRoute><MyApplications /></ProtectedRoute>} />
+              <Route path="/my-applications/:id" element={<ProtectedRoute><ApplicationDetail /></ProtectedRoute>} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/add-pet" element={<ProtectedRoute><AddPet /></ProtectedRoute>} />

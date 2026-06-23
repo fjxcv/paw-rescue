@@ -61,3 +61,5 @@ github_setup.bat
 /backend/staticfiles/
 /backend/ml/breed_classifier.pt
 /backend/ml/data/
+backend/db.sqlite3
+backend/db.sqlite3

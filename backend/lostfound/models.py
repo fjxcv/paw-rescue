@@ -3,6 +3,7 @@ from django.db import models
 
 
 class LostFoundPost(models.Model):
+    """报失/寻主记录"""
     POST_TYPE_CHOICES = [('lost', 'Lost'), ('found', 'Found')]
     STATUS_CHOICES = [
         ('searching', 'Searching'),

@@ -23,17 +23,37 @@ class PetProfileViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
+        if self.action == 'my_pets':
+            return [permissions.IsAuthenticated()]
         return [IsAdminRole()]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('rescue_case')
         species = self.request.query_params.get('species')
         adoption_status = self.request.query_params.get('adoption_status')
         is_public = self.request.query_params.get('is_public')
+        gender = self.request.query_params.get('gender')
+        search = self.request.query_params.get('search')
+        location = self.request.query_params.get('location')
+        age_min = self.request.query_params.get('age_min')
+        age_max = self.request.query_params.get('age_max')
+        size_category = self.request.query_params.get('size_category')
         if species:
             qs = qs.filter(species=species)
+        if gender:
+            qs = qs.filter(gender=gender)
+        if size_category:
+            qs = qs.filter(size_category=size_category)
         if adoption_status:
             qs = qs.filter(adoption_status=adoption_status)
+        if search:
+            qs = qs.filter(name__icontains=search)
+        if location:
+            qs = qs.filter(rescue_case__discover_address__icontains=location)
+        if age_min:
+            qs = qs.filter(age_months__gte=int(age_min))
+        if age_max:
+            qs = qs.filter(age_months__lte=int(age_max))
         if is_public is not None and self.action in ['list', 'retrieve']:
             if not (self.request.user.is_authenticated and getattr(self.request.user.profile, 'role', None) == 'admin'):
                 qs = qs.filter(is_public=True)
@@ -41,19 +61,28 @@ class PetProfileViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_public=is_public.lower() == 'true')
         return qs
 
+    @action(detail=False, methods=['get'], url_path='my')
+    def my_pets(self, request):
+        """获取当前用户发布的领养宠物（通过 rescue_case 关联）"""
+        qs = PetProfile.objects.filter(
+            rescue_case__reporter=request.user,
+        ).select_related('rescue_case')
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
 
 class AdoptApplicationViewSet(viewsets.ModelViewSet):
-    queryset = AdoptApplication.objects.select_related('applicant', 'pet', 'auditor').all()
+    queryset = AdoptApplication.objects.select_related('applicant', 'pet', 'auditor', 'offline_verify').all()
     serializer_class = AdoptApplicationSerializer
     http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
 
     def get_permissions(self):
-        if self.action in ['create', 'my', 'questionnaire', 'attachments']:
+        if self.action in ['create', 'my', 'retrieve', 'questionnaire', 'attachments']:
             return [permissions.IsAuthenticated()]
         return [IsAdminRole()]
 
     def get_queryset(self):
-        if self.action == 'my':
+        if self.action in ['my', 'retrieve']:
             return self.queryset.filter(applicant=self.request.user)
         return self.queryset
 
@@ -128,8 +157,15 @@ class AdminOfflineVerifyViewSet(viewsets.GenericViewSet):
 
     def update(self, request, pk=None):
         verify = self.get_object()
-        verify.verify_status = request.data.get('verify_status', verify.verify_status)
-        verify.verify_note = request.data.get('verify_note', verify.verify_note)
+        new_status = request.data.get('verify_status', verify.verify_status)
+        verify_note = request.data.get('verify_note', verify.verify_note)
+        if new_status == 'failed' and not (verify_note or '').strip():
+            return Response(
+                {'verify_note': '核验失败时必须填写失败原因'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        verify.verify_status = new_status
+        verify.verify_note = verify_note
         verify.verifier = request.user
         verify.verified_at = timezone.now()
         verify.save()

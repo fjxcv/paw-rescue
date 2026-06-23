@@ -2,6 +2,7 @@ from django.db import models
 
 
 class PortalCarousel(models.Model):
+    """首页轮播图"""
     STATUS_CHOICES = [(0, 'Offline'), (1, 'Online')]
 
     title = models.CharField(max_length=100, blank=True, null=True)

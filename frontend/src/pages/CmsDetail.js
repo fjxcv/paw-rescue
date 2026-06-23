@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { cmsAPI } from '../api/api';
 import { ARTICLE_TYPES } from '../constants/site';
@@ -10,8 +10,11 @@ const CmsDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
     const fetchArticle = async () => {
       try {
         setLoading(true);
@@ -68,7 +71,7 @@ const CmsDetail = () => {
 
   if (error || !article) {
     return (
-      <div>
+      <div className="text-center">
         <div className="alert alert-danger">{error || '文章未找到'}</div>
         <Link to="/cms" className="btn btn-outline-secondary">返回列表</Link>
       </div>
@@ -111,7 +114,7 @@ const CmsDetail = () => {
         </div>
       </article>
 
-      <div className="mt-4 d-flex flex-wrap gap-2">
+      <div className="mt-4 d-flex flex-wrap justify-content-center gap-2">
         <button
           type="button"
           className={`btn ${article.is_favorited ? 'btn-warning' : 'btn-outline-warning'}`}

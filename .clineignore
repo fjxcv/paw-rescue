@@ -1,0 +1,18 @@
+# --- 系统级禁区 (绝对禁止修改) ---
+venv/
+node_modules/
+backend/db.sqlite3
+backend/media/
+backend/__pycache__/
+frontend/node_modules/
+frontend/build/
+
+# --- 自动生成/版本控制禁区 ---
+**/migrations/
+frontend/package-lock.json
+
+# --- 核心配置保护区 (修改前必须经过你的手动确认) ---
+backend/backend/settings.py
+backend/backend/urls.py
+backend/.env
+frontend/.env.production

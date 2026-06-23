@@ -6,9 +6,26 @@ from pets.models import AdoptApplication, AdoptAttachment, AdoptOfflineVerify, A
 
 
 class PetProfileSerializer(serializers.ModelSerializer):
+    rescue_case_address = serializers.SerializerMethodField()
+    rescue_case_appearance = serializers.SerializerMethodField()
+    size_category_display = serializers.SerializerMethodField()
+
     class Meta:
         model = PetProfile
         fields = '__all__'
+
+    def get_rescue_case_address(self, obj):
+        if obj.rescue_case:
+            return obj.rescue_case.discover_address
+        return None
+
+    def get_rescue_case_appearance(self, obj):
+        if obj.rescue_case:
+            return obj.rescue_case.appearance
+        return None
+
+    def get_size_category_display(self, obj):
+        return obj.get_size_category_display() if obj.size_category else None
 
 
 class AdoptApplicationSerializer(serializers.ModelSerializer):
@@ -17,14 +34,30 @@ class AdoptApplicationSerializer(serializers.ModelSerializer):
     pet_id = serializers.PrimaryKeyRelatedField(
         queryset=PetProfile.objects.all(), source='pet', write_only=True
     )
+    verify_status = serializers.SerializerMethodField()
+    verify_note = serializers.SerializerMethodField()
 
     class Meta:
         model = AdoptApplication
         fields = [
             'id', 'applicant', 'pet', 'pet_id', 'online_status', 'audit_opinion',
             'auditor', 'audited_at', 'message', 'created_at', 'updated_at',
+            'verify_status', 'verify_note',
         ]
-        read_only_fields = ['applicant', 'auditor', 'audited_at', 'created_at', 'updated_at']
+        read_only_fields = ['applicant', 'auditor', 'audited_at', 'created_at', 'updated_at',
+                            'verify_status', 'verify_note']
+
+    def get_verify_status(self, obj):
+        try:
+            return obj.offline_verify.verify_status
+        except AdoptOfflineVerify.DoesNotExist:
+            return None
+
+    def get_verify_note(self, obj):
+        try:
+            return obj.offline_verify.verify_note
+        except AdoptOfflineVerify.DoesNotExist:
+            return None
 
     def validate(self, attrs):
         pet = attrs.get('pet') or getattr(self.instance, 'pet', None)
@@ -68,6 +101,13 @@ class AdoptApplicationAuditSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdoptApplication
         fields = ['online_status', 'audit_opinion']
+
+    def validate(self, attrs):
+        online_status = attrs.get('online_status')
+        audit_opinion = attrs.get('audit_opinion', '')
+        if online_status == 'rejected' and not audit_opinion.strip():
+            raise serializers.ValidationError({'audit_opinion': '拒绝时必须填写驳回原因'})
+        return attrs
 
     def update(self, instance, validated_data):
         instance.online_status = validated_data.get('online_status', instance.online_status)

@@ -1,56 +1,212 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { rescueAPI } from '../api/api';
-import { RESCUE_STATUS } from '../constants/site';
+import { SIZE_CATEGORY, HEALTH_STATUS } from '../constants/site';
+
+const MY_RESCUES_KEY = 'pet_connect_my_rescues';
+
+const loadMyRescues = () => {
+  try {
+    return JSON.parse(localStorage.getItem(MY_RESCUES_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const saveMyRescues = (records) => {
+  localStorage.setItem(MY_RESCUES_KEY, JSON.stringify(records));
+};
+
+// 去掉经纬度（格式如 "地址（30.123, 104.456）"）
+const stripCoord = (addr) => {
+  if (!addr) return addr;
+  return addr.replace(/（\d+\.?\d*,\s*\d+\.?\d*）$/, '').trim();
+};
+
+// 根据新字段构建描述文本
+const buildDescription = (item) => {
+  const hasNewFields = item.size_category || item.health_status || item.nickname || item.contact;
+
+  if (!hasNewFields) {
+    return { narrative: item.appearance || '暂无描述', detail: '' };
+  }
+
+  const name = item.nickname || '某用户';
+  const location = stripCoord(item.discover_address) || '某处';
+
+  const narrative = `${name}在${location}发现一只流浪动物，待人前来救助...`;
+
+  const parts = [];
+  if (item.size_category) parts.push(`体型: ${SIZE_CATEGORY[item.size_category] || item.size_category}`);
+  if (item.health_status) parts.push(`健康: ${HEALTH_STATUS[item.health_status] || item.health_status}`);
+  parts.push(`受伤: ${item.is_injured ? '是' : '否'}`);
+  parts.push(`怕人: ${item.afraid_of_people ? '是' : '否'}`);
+
+  const detail = '详情：' + parts.join('，');
+
+  return { narrative, detail };
+};
 
 const RescueList = () => {
+  const navigate = useNavigate();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [helpingId, setHelpingId] = useState(null);
+
+  const fetchCases = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const currentMyRescues = loadMyRescues();
+      const helpedIds = new Set(currentMyRescues.map((r) => r.id));
+      const res = await rescueAPI.getMyCases();
+      const list = Array.isArray(res.data) ? res.data : (res.data.results || []);
+      setCases(list.filter((c) => !helpedIds.has(c.id)));
+    } catch (err) {
+      setError('加载救助记录失败，请稍后重试。');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await rescueAPI.getAll();
-        setCases(res.data);
-      } catch (err) {
-        setError('加载救助案例失败。');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    fetchCases();
+  }, [fetchCases]);
+
+  const formatTime = (iso) => {
+    const d = new Date(iso);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const handleHelp = async (item) => {
+    setHelpingId(item.id);
+    try {
+      await rescueAPI.help(item.id);
+    } catch (err) {
+      console.error(err);
+    }
+    setTimeout(() => {
+      setCases((prev) => prev.filter((c) => c.id !== item.id));
+      const currentMyRescues = loadMyRescues();
+      const updated = [item, ...currentMyRescues.filter((r) => r.id !== item.id)];
+      saveMyRescues(updated);
+      setHelpingId(null);
+    }, 300);
+  };
 
   return (
     <div className="py-3">
+      {/* 顶部：标题 + 三个功能入口按钮 */}
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2><i className="fas fa-hand-holding-heart me-2 text-success"></i>救助追踪</h2>
-        <Link to="/rescue/report" className="btn btn-success"><i className="fas fa-plus me-1"></i>上报救助</Link>
+        <h2 className="mb-0">
+          <i className="fas fa-hand-holding-heart me-2 text-success"></i>救助追踪
+        </h2>
+        <div className="d-flex gap-2">
+          <button className="btn btn-outline-success" type="button" title="查看我救助的记录" onClick={() => navigate('/my-rescues')}>
+            <i className="fas fa-list-check me-1"></i>我的救助
+          </button>
+          <button className="btn btn-outline-success" type="button" title="上报新的救助信息" onClick={() => navigate('/rescue/report')}>
+            <i className="fas fa-plus me-1"></i>上报
+          </button>
+          <button className="btn btn-outline-success" type="button" title="查询救助记录" onClick={() => navigate('/rescue/search')}>
+            <i className="fas fa-search me-1"></i>查询
+          </button>
+        </div>
       </div>
-      {loading && <div className="text-center py-5"><div className="spinner-border text-success"></div><p className="mt-2">加载中...</p></div>}
-      {error && <div className="alert alert-danger">{error}</div>}
-      {!loading && !error && (
+
+      {loading && (
+        <div className="text-center py-5">
+          <div className="spinner-border text-success" role="status"></div>
+          <p className="mt-2 text-muted">加载中...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="alert alert-danger d-flex align-items-center gap-2">
+          <i className="fas fa-exclamation-triangle"></i>
+          <span>{error}</span>
+          <button className="btn btn-outline-danger btn-sm ms-auto" onClick={fetchCases}>
+            重试
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && cases.length === 0 && (
+        <div className="text-center py-5">
+          <i className="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
+          <p className="text-muted">
+            暂无上报记录，点击上方上报按钮发布第一条救助信息。
+          </p>
+        </div>
+      )}
+
+      {!loading && !error && cases.length > 0 && (
         <div className="row">
-          {cases.length === 0 ? (
-            <div className="col-12 text-center text-muted py-5">暂无救助记录</div>
-          ) : cases.map((item) => (
-            <div key={item.id} className="col-md-6 col-lg-4 mb-4">
-              <div className="card h-100 shadow-sm">
-                {item.photo_urls?.[0] && <img src={item.photo_urls[0]} className="card-img-top" alt="" style={{height:'180px',objectFit:'cover'}} />}
-                <div className="card-body">
-                  <span className="badge bg-primary me-2">{item.rescue_no}</span>
-                  <span className="badge bg-secondary">{RESCUE_STATUS[item.current_status] || item.current_status}</span>
-                  <p className="card-text small text-muted mt-2">{item.appearance?.slice(0,100) || '无描述'}</p>
-                  {item.discover_address && <p className="small"><i className="fas fa-map-marker-alt me-1"></i>{item.discover_address}</p>}
-                </div>
-              </div>
+          <div className="col-lg-8 mx-auto">
+            <div className="list-group">
+              {cases.map((item) => {
+                const { narrative, detail } = buildDescription(item);
+                return (
+                  <div
+                    key={item.id}
+                    className={`list-group-item p-0 ${helpingId === item.id ? 'opacity-50' : ''}`}
+                    style={{ transition: 'opacity 0.3s ease', borderLeft: 'none', borderRight: 'none' }}
+                  >
+                    <div className="d-flex" style={{ minHeight: 140 }}>
+                      <div className="flex-shrink-0" style={{ width: 140, minHeight: 140 }}>
+                        {item.photo_urls?.[0] ? (
+                          <img
+                            src={item.photo_urls[0]}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        ) : (
+                          <div
+                            className="d-flex align-items-center justify-content-center bg-light"
+                            style={{ width: '100%', height: '100%' }}
+                          >
+                            <i className="fas fa-paw fa-3x text-muted"></i>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-grow-1 d-flex flex-column justify-content-center px-3 py-2 min-w-0" style={{ overflow: 'hidden' }}>
+                        <p className="mb-1" style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.6 }}>
+                          {narrative}
+                        </p>
+                        {detail && (
+                          <p className="mb-1 text-muted" style={{ fontSize: '0.85rem', wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.5 }}>
+                            {detail}
+                          </p>
+                        )}
+                        <small className="text-muted mt-1">
+                          发布于{formatTime(item.created_at)}
+                        </small>
+                      </div>
+
+                      <div className="flex-shrink-0 d-flex flex-column justify-content-end align-items-end px-2 py-2" style={{ minWidth: 80 }}>
+                        <button
+                          className="btn btn-success btn-sm"
+                          type="button"
+                          onClick={() => handleHelp(item)}
+                          disabled={helpingId === item.id}
+                        >
+                          救助
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          </div>
         </div>
       )}
     </div>
   );
 };
+
 export default RescueList;
