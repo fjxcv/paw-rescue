@@ -2,6 +2,8 @@ import api from './index';
 
 export const portalAPI = {
   getCarousel: () => api.get('/portal/carousel/'),
+  getStats: () => api.get('/portal/stats/'),
+  getDashboard: () => api.get('/portal/dashboard/'),
 };
 
 export const cmsAPI = {
@@ -14,6 +16,7 @@ export const cmsAPI = {
   getFavorites: () => api.get('/cms/favorites/'),
   favoriteArticle: (id) => api.post(`/cms/articles/${id}/favorite/`),
   unfavoriteArticle: (id) => api.delete(`/cms/articles/${id}/favorite/`),
+  getAnnouncements: () => api.get('/cms/announcements/'),
 };
 
 export const usersAPI = {
@@ -27,6 +30,8 @@ export const lostFoundAPI = {
   getById: (id) => api.get(`/lost-found/${id}/`),
   create: (data) => api.post('/lost-found/', data),
   update: (id, data) => api.patch(`/lost-found/${id}/`, data),
+  getNearby: (params) => api.get('/lost-found/nearby/', { params }),
+  getMyPosts: () => api.get('/lost-found/my_posts/'),
 };
 
 export const communityAPI = {

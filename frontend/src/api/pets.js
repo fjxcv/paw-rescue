@@ -17,6 +17,7 @@ export const petsAPI = {
   create: (data) => api.post('/pets/', data),
   update: (id, data) => api.patch(`/pets/${id}/`, data),
   delete: (id) => api.delete(`/pets/${id}/`),
+  getMyPets: () => api.get('/pets/my/'),
 };
 
 export const rescueAPI = {
