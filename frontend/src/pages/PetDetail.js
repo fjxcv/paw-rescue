@@ -28,12 +28,99 @@ const formatAgeMonths = (months) => {
   return `${years}岁${rem}个月`;
 };
 
+// 英文城市名 → 中文映射（兜底用）
+const CITY_NAME_MAP = {
+  chengdu: '成都市',
+  beijing: '北京市',
+  shanghai: '上海市',
+  guangzhou: '广州市',
+  shenzhen: '深圳市',
+  hangzhou: '杭州市',
+  nanjing: '南京市',
+  wuhan: '武汉市',
+  chongqing: '重庆市',
+  xian: '西安市',
+  changsha: '长沙市',
+  zhengzhou: '郑州市',
+  jinan: '济南市',
+  qingdao: '青岛市',
+  dalian: '大连市',
+  xiamen: '厦门市',
+  suzhou: '苏州市',
+  kunming: '昆明市',
+  fuzhou: '福州市',
+  hefei: '合肥市',
+  nanchang: '南昌市',
+  taiyuan: '太原市',
+  lanzhou: '兰州市',
+  guiyang: '贵阳市',
+  nanning: '南宁市',
+  haerbin: '哈尔滨市',
+  shenyang: '沈阳市',
+  tianjin: '天津市',
+};
+const NORMALIZE_CITY_MAP = Object.fromEntries(
+  Object.entries(CITY_NAME_MAP).map(([k, v]) => [k.replace(/\s/g, '').toLowerCase(), v])
+);
+
 // 从详细地址中提取市级名称
 const extractCity = (address) => {
   if (!address) return null;
   const idx = address.indexOf('市');
   if (idx !== -1) return address.substring(0, idx + 1);
-  return address.length > 4 ? address.substring(0, 4) : address;
+  // 全英文/拼音地址 → 尝试映射为中文城市名
+  if (!/[一-龥]/.test(address)) {
+    const normalized = address.replace(/\s/g, '').toLowerCase();
+    if (NORMALIZE_CITY_MAP[normalized]) return NORMALIZE_CITY_MAP[normalized];
+    for (const [en, zh] of Object.entries(NORMALIZE_CITY_MAP)) {
+      if (en.startsWith(normalized) || normalized.startsWith(en)) return zh;
+    }
+    return address;
+  }
+  return address.length > 6 ? address.substring(0, 6) : address;
+};
+
+// 非犬类物种通常体型较小
+const NON_DOG_SPECIES = ['cat', 'bird', 'rabbit', 'fish', 'other'];
+
+// 健康状态中英文映射
+const HEALTH_STATUS_LABELS = {
+  vaccinated: '已接种疫苗',
+  neutered: '已绝育',
+  spayed: '已绝育',
+  dewormed: '已驱虫',
+  healthy: '健康',
+  'minor injury': '轻微伤病',
+  'minor_injury': '轻微伤病',
+  'severe injury': '严重伤病',
+  'severe_injury': '严重伤病',
+  injured: '有伤病',
+  'under treatment': '治疗中',
+  'under_treatment': '治疗中',
+  recovered: '已康复',
+  unknown: '未知',
+};
+
+const formatHealthStatus = (status) => {
+  if (!status) return null;
+  if (/[一-龥]/.test(status)) return status;
+  const lower = status.toLowerCase().trim();
+  if (HEALTH_STATUS_LABELS[lower]) return HEALTH_STATUS_LABELS[lower];
+  let result = status;
+  for (const [en, zh] of Object.entries(HEALTH_STATUS_LABELS)) {
+    if (en.length > 3 && lower.includes(en)) {
+      const regex = new RegExp(en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      if (regex.test(result)) result = result.replace(regex, zh);
+    }
+  }
+  return /[一-龥]/.test(result) ? result : status;
+};
+
+const formatSizeDisplay = (pet) => {
+  if (pet.size_category_display) return pet.size_category_display;
+  if (pet.species === 'dog') return null;
+  if (NON_DOG_SPECIES.includes(pet.species)) return '小型';
+  return null;
 };
 
 const ADOPTION_BADGE = {
@@ -316,10 +403,10 @@ const PetDetail = () => {
                   <span className="inline-label">年龄</span>
                   <span className="inline-value">{petAge}</span>
                 </div>
-                {(pet.size_category_display || pet.rescue_case_appearance) && (
+                {(pet.size_category_display || (!pet.size_category_display && pet.species !== 'dog')) && (
                   <div className="info-item-inline">
                     <span className="inline-label">体型</span>
-                    <span className="inline-value">{pet.size_category_display || pet.rescue_case_appearance}</span>
+                    <span className="inline-value">{formatSizeDisplay(pet) || '未知'}</span>
                   </div>
                 )}
                 {cityName && (
@@ -330,7 +417,7 @@ const PetDetail = () => {
                 )}
                 <div className="info-item-inline">
                   <span className="inline-label">健康</span>
-                  <span className="inline-value">{pet.health_status || '未填写'}</span>
+                  <span className="inline-value">{formatHealthStatus(pet.health_status) || '未填写'}</span>
                 </div>
                 {pet.rescue_case && (
                   <div className="info-item-inline">
@@ -548,6 +635,16 @@ const PetDetail = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ===== 底部返回按钮 ===== */}
+      <div className="container py-3 text-center">
+        <button
+          className="btn btn-outline-success btn-lg back-btn-bottom"
+          onClick={() => navigate('/pets')}
+        >
+          <i className="fas fa-arrow-left me-2"></i>返回领养列表
+        </button>
       </div>
 
       {/* ===== 样式 ===== */}
@@ -798,6 +895,23 @@ const PetDetail = () => {
           transition: all 0.3s ease;
         }
         .step-line.completed { background: #28a745; }
+
+        /* ===== 底部返回按钮 ===== */
+        .back-btn-bottom {
+          border-radius: 30px;
+          padding: 0.7rem 2.5rem;
+          font-size: 1.05rem;
+          border: 2px solid #00C897;
+          color: #00C897;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .back-btn-bottom:hover {
+          background-color: #00C897;
+          color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 15px rgba(0, 200, 151, 0.3);
+        }
       `}</style>
     </div>
   );

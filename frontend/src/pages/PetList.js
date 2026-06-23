@@ -35,13 +35,113 @@ const SIZE_LABELS = {
   large: '大型',
 };
 
-// 从详细地址中提取市级名称，如"成都市锦江区东大街"→"成都"
+// 非犬类物种通常体型较小
+const NON_DOG_SPECIES = ['cat', 'bird', 'rabbit', 'fish', 'other'];
+
+// 健康状态中英文映射
+const HEALTH_STATUS_LABELS = {
+  vaccinated: '已接种疫苗',
+  neutered: '已绝育',
+  spayed: '已绝育',
+  dewormed: '已驱虫',
+  healthy: '健康',
+  'minor injury': '轻微伤病',
+  'minor_injury': '轻微伤病',
+  'severe injury': '严重伤病',
+  'severe_injury': '严重伤病',
+  injured: '有伤病',
+  'under treatment': '治疗中',
+  'under_treatment': '治疗中',
+  recovered: '已康复',
+  unknown: '未知',
+};
+
+// 格式化健康状态为中文显示
+const formatHealthStatus = (status) => {
+  if (!status) return null;
+  // 如果已经是中文（包含中文字符），直接返回
+  if (/[一-龥]/.test(status)) return status;
+  // 尝试映射英文值（大小写不敏感）
+  const lower = status.toLowerCase().trim();
+  if (HEALTH_STATUS_LABELS[lower]) return HEALTH_STATUS_LABELS[lower];
+  // 尝试逐一替换英文关键词
+  let result = status;
+  for (const [en, zh] of Object.entries(HEALTH_STATUS_LABELS)) {
+    if (en.length > 3 && lower.includes(en)) {
+      // 用正则替换，避免重复添加
+      const regex = new RegExp(en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      if (regex.test(result)) {
+        result = result.replace(regex, zh);
+      }
+    }
+  }
+  // 如果替换后仍无中文，返回原值；否则返回替换结果
+  return /[一-龥]/.test(result) ? result : status;
+};
+
+// 格式化体型显示：优先使用 size_category_display，否则根据物种推断
+const formatSizeDisplay = (pet) => {
+  if (pet.size_category_display) return pet.size_category_display;
+  // 犬类没有填写体型时显示"未知"，非犬类默认"小型"
+  if (pet.species === 'dog') return null;
+  if (NON_DOG_SPECIES.includes(pet.species)) return '小型';
+  return null;
+};
+
+// 英文城市名 → 中文映射（兜底用）
+const CITY_NAME_MAP = {
+  chengdu: '成都市',
+  beijing: '北京市',
+  shanghai: '上海市',
+  guangzhou: '广州市',
+  shenzhen: '深圳市',
+  hangzhou: '杭州市',
+  nanjing: '南京市',
+  wuhan: '武汉市',
+  chongqing: '重庆市',
+  xian: '西安市',
+  changsha: '长沙市',
+  zhengzhou: '郑州市',
+  jinan: '济南市',
+  qingdao: '青岛市',
+  dalian: '大连市',
+  xiamen: '厦门市',
+  suzhou: '苏州市',
+  kunming: '昆明市',
+  fuzhou: '福州市',
+  hefei: '合肥市',
+  nanchang: '南昌市',
+  taiyuan: '太原市',
+  lanzhou: '兰州市',
+  guiyang: '贵阳市',
+  nanning: '南宁市',
+  haerbin: '哈尔滨市',
+  shenyang: '沈阳市',
+  tianjin: '天津市',
+};
+const NORMALIZE_CITY_MAP = Object.fromEntries(
+  Object.entries(CITY_NAME_MAP).map(([k, v]) => [k.replace(/\s/g, '').toLowerCase(), v])
+);
+
+// 从详细地址中提取市级名称，如"成都市锦江区东大街"→"成都市"
 const extractCity = (address) => {
   if (!address) return null;
+  // 尝试按"市"字截取，如"成都市锦江区…"→"成都市"
   const idx = address.indexOf('市');
   if (idx !== -1) return address.substring(0, idx + 1);
-  // 直辖市或没有"市"字的：取前4个字符
-  return address.length > 4 ? address.substring(0, 4) : address;
+  // 全英文/拼音地址 → 尝试映射为中文城市名
+  if (!/[一-龥]/.test(address)) {
+    const normalized = address.replace(/\s/g, '').toLowerCase();
+    // 先精确匹配
+    if (NORMALIZE_CITY_MAP[normalized]) return NORMALIZE_CITY_MAP[normalized];
+    // 再前缀匹配（如 "Chen" 匹配 "chengdu"）
+    for (const [en, zh] of Object.entries(NORMALIZE_CITY_MAP)) {
+      if (en.startsWith(normalized) || normalized.startsWith(en)) return zh;
+    }
+    return address;
+  }
+  // 中文地址但没有"市"字（可能为直辖市或区域）：取前6个字符
+  return address.length > 6 ? address.substring(0, 6) : address;
 };
 
 const formatAgeMonths = (months) => {
@@ -413,12 +513,10 @@ const PetList = () => {
                       <span className="info-value">{formatAgeMonths(pet.age_months)}</span>
                     </div>
                     {/* 体型 */}
-                    {(pet.size_category_display || pet.rescue_case_appearance) && (
+                    {formatSizeDisplay(pet) && (
                       <div className="info-row">
                         <span className="info-label"><i className="fas fa-weight me-1"></i>体型</span>
-                        <span className="info-value">
-                          {pet.size_category_display || pet.rescue_case_appearance}
-                        </span>
+                        <span className="info-value">{formatSizeDisplay(pet)}</span>
                       </div>
                     )}
                     {/* 所在地区（截断到市级） */}
@@ -434,7 +532,7 @@ const PetList = () => {
                     {pet.health_status && (
                       <div className="info-row">
                         <span className="info-label"><i className="fas fa-heartbeat me-1"></i>健康</span>
-                        <span className="info-value">{pet.health_status}</span>
+                        <span className="info-value">{formatHealthStatus(pet.health_status)}</span>
                       </div>
                     )}
                   </div>
