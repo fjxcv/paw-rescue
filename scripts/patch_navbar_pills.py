@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+# -*- coding: utf-8 -*-
+"""Rewrite Navbar.js with active pill navigation (scheme A+B)."""
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTENT = r'''import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { authAPI } from '../api/api';
 import { SITE_NAME } from '../constants/site';
@@ -189,3 +194,9 @@ const Navbar = () => {
 };
 
 export default Navbar;
+'''
+
+if __name__ == '__main__':
+    path = ROOT / 'frontend/src/components/Navbar.js'
+    path.write_text(CONTENT, encoding='utf-8', newline='\n')
+    print('Wrote', path)

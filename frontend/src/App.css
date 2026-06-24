@@ -37,6 +37,92 @@
   }
 }
 
+/* Top navbar: pill tabs + active route highlight */
+.navbar-main-pills {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.14);
+}
+
+@media (min-width: 992px) {
+  .navbar-main-pills {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+.navbar-main-link {
+  border-radius: 8px !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-weight: 500;
+  padding: 0.45rem 0.85rem !important;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.navbar-main-link:hover,
+.navbar-main-link:focus {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.navbar-main-link.active {
+  background-color: #fff !important;
+  color: #ff8c00 !important;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-main-link--admin {
+  opacity: 0.95;
+}
+
+.navbar-main-link--admin.active {
+  background-color: #fff8e6 !important;
+  color: #9a6700 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.navbar-auth-link {
+  border-radius: 8px !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  padding: 0.45rem 0.75rem !important;
+}
+
+.navbar-auth-link.active {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.navbar-user-link.active {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 991.98px) {
+  .navbar-main-pills {
+    background-color: rgba(0, 0, 0, 0.08);
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .navbar-main-link.active {
+    box-shadow: none;
+    border-left: 3px solid #fff;
+    padding-left: calc(0.85rem - 3px) !important;
+  }
+
+  .navbar-main-link--admin.active {
+    border-left-color: #fff8e6;
+  }
+}
+
 .tab-wrap {
   display: flex;
   flex-wrap: nowrap !important;
@@ -55,7 +141,7 @@
 
 .tab-wrap .nav-link {
   border: none !important;
-  /* 移除胶囊圆角 999px，改为直角 */
+  /* 移除胶囊圆角 999px，改为直规1�7 */
   border-radius: 8px !important;
   /* 去掉默认浅灰底色，设透明 */
   background-color: transparent;
@@ -66,7 +152,7 @@
 }
 
 .tab-wrap .nav-link:hover {
-  /* 悬浮轻微加深底色，透明底色下用浅灰 hover */
+  /* 悬浮轻微加深底色，��明底色下用浅灰 hover */
   background-color: #e5e7eb;
 }
 
