@@ -1,0 +1,15 @@
+{
+  "short_name": "暖爪救助",
+  "name": "暖爪救助 - 流浪宠物综合救助管理平台",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#ff8c00",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
