@@ -195,6 +195,9 @@ const PetList = () => {
   const [ageStage, setAgeStage] = useState(searchParams.get('age_stage') || '');
   const [customAgeMin, setCustomAgeMin] = useState(searchParams.get('age_min') || '');
   const [customAgeMax, setCustomAgeMax] = useState(searchParams.get('age_max') || '');
+  // 本地输入状态：仅在回车或失焦时才提交到上面的筛选状态，避免每次按键都触发 API 请求
+  const [ageMinInput, setAgeMinInput] = useState(searchParams.get('age_min') || '');
+  const [ageMaxInput, setAgeMaxInput] = useState(searchParams.get('age_max') || '');
 
   const [nearbyMode, setNearbyMode] = useState(searchParams.get('nearby') === 'true');
   const [radiusKm, setRadiusKm] = useState(searchParams.get('radius_km') || '10');
@@ -333,6 +336,11 @@ const PetList = () => {
     setSearch(searchText.trim());
   };
 
+  const handleConfirmAge = () => {
+    setCustomAgeMin(ageMinInput);
+    setCustomAgeMax(ageMaxInput);
+  };
+
   const handleNearbySearch = () => {
     if (!navigator.geolocation) {
       setError('当前浏览器不支持定位，请更换浏览器重试。');
@@ -387,6 +395,8 @@ const PetList = () => {
     setAgeStage('');
     setCustomAgeMin('');
     setCustomAgeMax('');
+    setAgeMinInput('');
+    setAgeMaxInput('');
     setNearbyMode(false);
     setRadiusKm('10');
     setLocationHint('');
@@ -550,8 +560,10 @@ const PetList = () => {
                     min="0"
                     className="form-control"
                     placeholder="最小月龄"
-                    value={customAgeMin}
-                    onChange={(e) => setCustomAgeMin(e.target.value)}
+                    value={ageMinInput}
+                    onChange={(e) => setAgeMinInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmAge()}
+                    onBlur={handleConfirmAge}
                   />
                 </div>
                 <div className="col-6 col-md-2">
@@ -560,8 +572,10 @@ const PetList = () => {
                     min="0"
                     className="form-control"
                     placeholder="最大月龄"
-                    value={customAgeMax}
-                    onChange={(e) => setCustomAgeMax(e.target.value)}
+                    value={ageMaxInput}
+                    onChange={(e) => setAgeMaxInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleConfirmAge()}
+                    onBlur={handleConfirmAge}
                   />
                 </div>
               </>
