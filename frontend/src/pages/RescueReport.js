@@ -41,7 +41,6 @@ const RescueReport = () => {
     discover_longitude: '',
     size_category: '',
     health_status: '',
-    is_injured: '',
     afraid_of_people: '',
   });
   const [photos, setPhotos] = useState([]);  // { name, url, size }
@@ -169,7 +168,6 @@ const RescueReport = () => {
     if (!form.discover_address.trim()) errs.discover_address = '请填写发现的详细位置';
     if (!form.size_category) errs.size_category = '请选择体型描述';
     if (!form.health_status) errs.health_status = '请选择健康状况';
-    if (form.is_injured === '' || form.is_injured === null) errs.is_injured = '请选择是否受伤';
     if (form.afraid_of_people === '' || form.afraid_of_people === null) errs.afraid_of_people = '请选择是否怕人';
     setFieldErrors(errs);
     return Object.keys(errs).length === 0;
@@ -189,10 +187,9 @@ const RescueReport = () => {
         nickname: form.nickname.trim(),
         contact: form.contact.trim(),
         discover_address: form.discover_address.trim(),
-        appearance: `体型: ${SIZE_CATEGORY[form.size_category] || form.size_category} / 健康: ${HEALTH_STATUS[form.health_status] || form.health_status} / 受伤: ${form.is_injured === 'yes' ? '是' : '否'} / 怕人: ${form.afraid_of_people === 'yes' ? '是' : '否'}`,
+        appearance: `体型: ${SIZE_CATEGORY[form.size_category] || form.size_category} / 健康: ${HEALTH_STATUS[form.health_status] || form.health_status} / 怕人: ${form.afraid_of_people === 'yes' ? '是' : '否'}`,
         size_category: form.size_category,
         health_status: form.health_status,
-        is_injured: form.is_injured === 'yes',
         afraid_of_people: form.afraid_of_people === 'yes',
         photo_urls: photos.map((p) => p.url),
       };
@@ -219,7 +216,6 @@ const RescueReport = () => {
       discover_longitude: '',
       size_category: '',
       health_status: '',
-      is_injured: '',
       afraid_of_people: '',
     });
     setPhotos([]);
@@ -516,44 +512,6 @@ const RescueReport = () => {
             {fieldErrors.health_status && (
               <div className="offset-sm-2 col-sm-10">
                 <div className="invalid-feedback d-block">{fieldErrors.health_status}</div>
-              </div>
-            )}
-          </div>
-
-          {/* 是否受伤 */}
-          <div className="row mb-3 align-items-center">
-            <label className={`${labelCol} fw-bold`}>是否受伤 <span className="text-danger">*</span></label>
-            <div className={inputCol}>
-              <div className={`d-flex gap-3 ${fieldErrors.is_injured ? 'border border-danger rounded p-2' : ''}`}>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="is_injured"
-                    id="injured_yes"
-                    value="yes"
-                    checked={form.is_injured === 'yes'}
-                    onChange={handleChange}
-                  />
-                  <label className="form-check-label" htmlFor="injured_yes">是</label>
-                </div>
-                <div className="form-check">
-                  <input
-                    className="form-check-input"
-                    type="radio"
-                    name="is_injured"
-                    id="injured_no"
-                    value="no"
-                    checked={form.is_injured === 'no'}
-                    onChange={handleChange}
-                  />
-                  <label className="form-check-label" htmlFor="injured_no">否</label>
-                </div>
-              </div>
-            </div>
-            {fieldErrors.is_injured && (
-              <div className="offset-sm-2 col-sm-10">
-                <div className="invalid-feedback d-block">{fieldErrors.is_injured}</div>
               </div>
             )}
           </div>

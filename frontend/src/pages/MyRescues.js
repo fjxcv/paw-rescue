@@ -74,7 +74,7 @@ const MyRescues = () => {
   const showUpdateBtn = (status) => status !== 'rescued' && status !== 'abandoned';
 
   return (
-    <div className="py-3">
+    <div className="d-flex flex-column py-3" style={{ minHeight: 'calc(100vh - 160px)' }}>
       {/* 顶部标题 */}
       <h2 className="mb-4">
         <i className="fas fa-heart me-2 text-success"></i>我的救助
@@ -125,9 +125,6 @@ const MyRescues = () => {
         <div className="text-center py-5">
           <i className="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
           <p className="text-muted">暂无救助动物记录。</p>
-          <button className="btn btn-outline-success mt-2" onClick={() => navigate('/rescue')}>
-            <i className="fas fa-arrow-left me-1"></i>返回
-          </button>
         </div>
       )}
 
@@ -138,7 +135,7 @@ const MyRescues = () => {
           <table className="table table-hover align-middle table-sm" style={{ fontSize: '0.9rem' }}>
             <thead className="table-light">
               <tr>
-                <th style={{ width: 85 }}>动物</th>
+                <th style={{ width: 85 }}>救助对象</th>
                 <th style={{ width: 155 }}>救助编号</th>
                 <th style={{ width: 100 }}>当前状态</th>
                 <th style={{ width: 105 }}>救助日期</th>
@@ -148,10 +145,10 @@ const MyRescues = () => {
             <tbody>
               {records.map((item) => (
                 <tr key={item.id}>
-                  {/* 动物照片缩略图 */}
-                  <td>
+                  {/* 救助对象照片缩略图 */}
+                  <td className="text-center">
                     <div
-                      className="rounded overflow-hidden"
+                      className="rounded overflow-hidden d-inline-block"
                       style={{ width: 48, height: 48 }}
                     >
                       {item.photo_urls?.[0] ? (
@@ -239,14 +236,15 @@ const MyRescues = () => {
           </div>
         )}
 
-        {/* 返回按钮 */}
-        <div className="text-center mt-4">
-          <button className="btn btn-outline-success" onClick={() => navigate('/rescue')}>
-            <i className="fas fa-arrow-left me-1"></i>返回
-          </button>
-        </div>
         </>
       )}
+
+      {/* 返回按钮：贴近白色区域底部 */}
+      <div className="text-center mt-auto pt-4 pb-3">
+        <button className="btn btn-outline-success" onClick={() => navigate('/rescue')}>
+          <i className="fas fa-arrow-left me-1"></i>返回
+        </button>
+      </div>
     </div>
   );
 };
