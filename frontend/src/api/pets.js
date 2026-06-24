@@ -13,6 +13,7 @@ export const uploadAPI = {
 
 export const petsAPI = {
   getAll: (params) => api.get('/pets/', { params }),
+  getNearby: (params) => api.get('/pets/nearby/', { params }),
   getById: (id) => api.get(`/pets/${id}/`),
   create: (data) => api.post('/pets/', data),
   update: (id, data) => api.patch(`/pets/${id}/`, data),

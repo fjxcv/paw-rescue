@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { adoptAPI, petsAPI, uploadAPI } from '../api/api';
 import { ADOPTION_STATUS } from '../constants/site';
 
@@ -28,56 +30,10 @@ const formatAgeMonths = (months) => {
   return `${years}岁${rem}个月`;
 };
 
-// 英文城市名 → 中文映射（兜底用）
-const CITY_NAME_MAP = {
-  chengdu: '成都市',
-  beijing: '北京市',
-  shanghai: '上海市',
-  guangzhou: '广州市',
-  shenzhen: '深圳市',
-  hangzhou: '杭州市',
-  nanjing: '南京市',
-  wuhan: '武汉市',
-  chongqing: '重庆市',
-  xian: '西安市',
-  changsha: '长沙市',
-  zhengzhou: '郑州市',
-  jinan: '济南市',
-  qingdao: '青岛市',
-  dalian: '大连市',
-  xiamen: '厦门市',
-  suzhou: '苏州市',
-  kunming: '昆明市',
-  fuzhou: '福州市',
-  hefei: '合肥市',
-  nanchang: '南昌市',
-  taiyuan: '太原市',
-  lanzhou: '兰州市',
-  guiyang: '贵阳市',
-  nanning: '南宁市',
-  haerbin: '哈尔滨市',
-  shenyang: '沈阳市',
-  tianjin: '天津市',
-};
-const NORMALIZE_CITY_MAP = Object.fromEntries(
-  Object.entries(CITY_NAME_MAP).map(([k, v]) => [k.replace(/\s/g, '').toLowerCase(), v])
-);
-
-// 从详细地址中提取市级名称
-const extractCity = (address) => {
-  if (!address) return null;
-  const idx = address.indexOf('市');
-  if (idx !== -1) return address.substring(0, idx + 1);
-  // 全英文/拼音地址 → 尝试映射为中文城市名
-  if (!/[一-龥]/.test(address)) {
-    const normalized = address.replace(/\s/g, '').toLowerCase();
-    if (NORMALIZE_CITY_MAP[normalized]) return NORMALIZE_CITY_MAP[normalized];
-    for (const [en, zh] of Object.entries(NORMALIZE_CITY_MAP)) {
-      if (en.startsWith(normalized) || normalized.startsWith(en)) return zh;
-    }
-    return address;
-  }
-  return address.length > 6 ? address.substring(0, 6) : address;
+const getRegionDisplay = (pet) => {
+  const region = [pet.country, pet.province, pet.city].filter(Boolean).join(' / ');
+  if (region) return region;
+  return pet.rescue_case_address || null;
 };
 
 // 非犬类物种通常体型较小
@@ -323,7 +279,7 @@ const PetDetail = () => {
   }
 
   const canAdopt = pet.adoption_status === 'available';
-  const cityName = extractCity(pet.rescue_case_address);
+  const cityName = getRegionDisplay(pet);
   const petAge = formatAgeMonths(pet.age_months);
 
   return (
@@ -476,11 +432,11 @@ const PetDetail = () => {
             <h4 className="section-title">
               <i className="fas fa-file-alt me-2"></i>捡拾详情描述
             </h4>
-            <div className="section-content">
+            <div className="section-content markdown-preview description-text">
               {pet.description ? (
-                <p className="description-text">{pet.description}</p>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{pet.description}</ReactMarkdown>
               ) : (
-                <p className="text-muted fst-italic">暂无详细描述信息。</p>
+                <p className="text-muted fst-italic mb-0">暂无详细描述信息。</p>
               )}
             </div>
           </div>
