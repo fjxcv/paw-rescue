@@ -16,7 +16,7 @@ from community.models import (
 from lostfound.models import LostFoundPost
 from pets.models import AdoptApplication, PetProfile
 from portal.models import PortalCarousel
-from rescue.models import RescueCase
+from rescue.models import RescueCase, RescueStageRecord, RescueStatusLog
 from system.models import PlatformConfig
 
 
@@ -531,6 +531,237 @@ class Command(BaseCommand):
             parent=c6,
             content='\u611f\u8c22\u5efa\u8bae\uff01\u4e4b\u524d\u62c5\u5fc3\u96ea\u7eb3\u745e\u8138\u6c14\u503c\uff0c\u8fd9\u4e0b\u6709\u53c2\u8003\u65b9\u5411\u4e86\uff0c\u6253\u7b97\u5e73\u53f0\u9886\u517b\u4e00\u53ea\u6210\u5e74\u96ea\u7eb3\u745e\u3002',
         )
+
+        # ====================== 扩展全国演示数据（多用户/多地区/多模块） ======================
+        user_specs = [
+            ('alice_demo', 'alice_demo@petrescue.local', '\u5317\u4eac\u5e02'),
+            ('bob_demo', 'bob_demo@petrescue.local', '\u4e0a\u6d77\u5e02'),
+            ('charlie_demo', 'charlie_demo@petrescue.local', '\u5e7f\u4e1c\u7701'),
+            ('diana_demo', 'diana_demo@petrescue.local', '\u6d59\u6c5f\u7701'),
+            ('eva_demo', 'eva_demo@petrescue.local', '\u6e56\u5317\u7701'),
+            ('frank_demo', 'frank_demo@petrescue.local', '\u9655\u897f\u7701'),
+            ('grace_demo', 'grace_demo@petrescue.local', '\u5c71\u4e1c\u7701'),
+            ('henry_demo', 'henry_demo@petrescue.local', '\u6cb3\u5357\u7701'),
+            ('ivy_demo', 'ivy_demo@petrescue.local', '\u4e91\u5357\u7701'),
+            ('jack_demo', 'jack_demo@petrescue.local', '\u798f\u5efa\u7701'),
+        ]
+        demo_users = []
+        for username, email, province in user_specs:
+            demo_u, _ = User.objects.update_or_create(username=username, defaults={'email': email})
+            demo_u.set_password('demo12345')
+            demo_u.save()
+            UserProfile.objects.filter(user=demo_u).update(
+                has_privacy_consent=True,
+                nickname=f'{username}_\u7231\u5fc3\u5fd7\u613f\u8005',
+                address=f'\u4e2d\u56fd{province}',
+            )
+            demo_users.append(demo_u)
+
+        rescue_specs = [
+            (
+                'RC20260625011',
+                demo_users[0],
+                Decimal('39.904200'),
+                Decimal('116.407400'),
+                '\u5317\u4eac\u5e02\u671d\u9633\u533a\u4e09\u91cc\u5c6f\u8857\u9053',
+                '\u68d5\u8272\u7530\u56ed\u72ac\uff0c\u53f3\u540e\u817f\u8f7b\u5fae\u53d7\u4f24',
+                '\u5df2\u6e05\u521b\u6d88\u6bd2\uff0c\u5f85\u590d\u67e5',
+                ['https://images.unsplash.com/photo-1517849845537-4d257902454a?w=800'],
+                'in_medical',
+            ),
+            (
+                'RC20260625012',
+                demo_users[1],
+                Decimal('31.230400'),
+                Decimal('121.473700'),
+                '\u4e0a\u6d77\u5e02\u9ec4\u6d66\u533a\u5357\u4eac\u4e1c\u8def',
+                '\u94f6\u6e10\u5c42\u82f1\u77ed\u732b\uff0c\u6027\u683c\u80c6\u5c0f',
+                '\u98df\u6b32\u6b63\u5e38\uff0c\u5df2\u5b8c\u6210\u4f53\u5185\u9a71\u866b',
+                ['https://images.unsplash.com/photo-1511044568932-338cba0ad803?w=800'],
+                'recovering',
+            ),
+            (
+                'RC20260625013',
+                demo_users[2],
+                Decimal('23.129100'),
+                Decimal('113.264400'),
+                '\u5e7f\u5dde\u5e02\u5929\u6cb3\u533a\u4f53\u80b2\u4e1c\u8def',
+                '\u9ed1\u767d\u5957\u88c5\u72ac\uff0c\u8033\u6735\u6709\u65e7\u4f24',
+                '\u7cbe\u795e\u72b6\u6001\u826f\u597d\uff0c\u5df2\u9884\u7ea6\u7edd\u80b2',
+                ['https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=800'],
+                'awaiting_adoption',
+            ),
+            (
+                'RC20260625014',
+                demo_users[3],
+                Decimal('30.274100'),
+                Decimal('120.155100'),
+                '\u676d\u5dde\u5e02\u897f\u6e56\u533a\u6587\u4e09\u8def',
+                '\u4e09\u82b1\u6bcd\u732b\uff0c\u4f53\u578b\u5a07\u5c0f',
+                '\u672f\u540e\u6062\u590d\u826f\u597d\uff0c\u53ef\u8fdb\u5165\u9886\u517b\u6d41\u7a0b',
+                ['https://images.unsplash.com/photo-1495360010541-f48722b34f7d?w=800'],
+                'awaiting_adoption',
+            ),
+            (
+                'RC20260625015',
+                demo_users[4],
+                Decimal('30.592800'),
+                Decimal('114.305500'),
+                '\u6b66\u6c49\u5e02\u6b66\u660c\u533a\u4e2d\u5317\u8def',
+                '\u9ec4\u767d\u67ef\u57fa\uff0c\u816e\u90e8\u624b\u672f\u540e\u5eb7\u590d',
+                '\u5df2\u63a5\u79cd\u5168\u5957\u75ab\u82d7',
+                ['https://images.unsplash.com/photo-1561037404-61cd46aa615b?w=800'],
+                'rescued',
+            ),
+        ]
+        rescue_cases = []
+        for rescue_no, reporter, lat, lon, address, appearance, health_note, photo_urls, status in rescue_specs:
+            case, _ = RescueCase.objects.update_or_create(
+                rescue_no=rescue_no,
+                defaults={
+                    'reporter': reporter,
+                    'discover_latitude': lat,
+                    'discover_longitude': lon,
+                    'discover_address': address,
+                    'appearance': appearance,
+                    'health_note': health_note,
+                    'photo_urls': photo_urls,
+                    'current_status': status,
+                },
+            )
+            rescue_cases.append(case)
+
+        for case in rescue_cases:
+            RescueStatusLog.objects.get_or_create(
+                rescue_case=case,
+                from_status='pending_rescue',
+                to_status='in_medical',
+                operator=case.reporter,
+                remark='\u7b2c\u4e00\u6b65\uff1a\u5df2\u5b89\u5168\u8f6c\u8fd0\u81f3\u5408\u4f5c\u5ba0\u7269\u533b\u9662',
+            )
+            RescueStatusLog.objects.get_or_create(
+                rescue_case=case,
+                from_status='in_medical',
+                to_status=case.current_status,
+                operator=admin,
+                remark='\u7b2c\u4e8c\u6b65\uff1a\u7efc\u5408\u8bc4\u4f30\u540e\u66f4\u65b0\u6551\u52a9\u9636\u6bb5',
+            )
+            RescueStageRecord.objects.get_or_create(
+                rescue_case=case,
+                operator=case.reporter,
+                content='\u7ebf\u4e0a\u5efa\u6863\u5e76\u4e0a\u4f20\u73b0\u573a\u7167\u7247\uff0c\u786e\u8ba4\u6551\u52a9\u4efb\u52a1\u3002',
+            )
+            RescueStageRecord.objects.get_or_create(
+                rescue_case=case,
+                operator=admin,
+                content='\u5b8c\u6210\u5065\u5eb7\u68c0\u67e5\uff0c\u8ffd\u52a0\u5fc3\u7406\u72b6\u6001\u8bc4\u4f30\u4e0e\u540e\u7eed\u8ffd\u8e2a\u8ba1\u5212\u3002',
+            )
+
+        pet_specs = [
+            ('\u5317\u5317', 'dog', '\u67ef\u57fa', 14, 'female', 'small', rescue_cases[0], '\u4e2d\u56fd', '\u5317\u4eac\u5e02', '\u5317\u4eac\u5e02', '\u671d\u9633\u533a', Decimal('39.904200'), Decimal('116.407400'), 'https://images.unsplash.com/photo-1525253086316-d0c936c814f8?w=800'),
+            ('\u6c64\u5706', 'cat', '\u82f1\u77ed', 10, 'male', 'small', rescue_cases[1], '\u4e2d\u56fd', '\u4e0a\u6d77\u5e02', '\u4e0a\u6d77\u5e02', '\u9ec4\u6d66\u533a', Decimal('31.230400'), Decimal('121.473700'), 'https://images.unsplash.com/photo-1472491235688-bdc81a63246e?w=800'),
+            ('\u53ef\u4e50', 'dog', '\u67f4\u72ac', 20, 'male', 'medium', rescue_cases[2], '\u4e2d\u56fd', '\u5e7f\u4e1c\u7701', '\u5e7f\u5dde\u5e02', '\u5929\u6cb3\u533a', Decimal('23.129100'), Decimal('113.264400'), 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800'),
+            ('\u7cd6\u7cd6', 'cat', '\u4e2d\u534e\u7530\u56ed\u732b', 6, 'female', 'small', rescue_cases[3], '\u4e2d\u56fd', '\u6d59\u6c5f\u7701', '\u676d\u5dde\u5e02', '\u897f\u6e56\u533a', Decimal('30.274100'), Decimal('120.155100'), 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=800'),
+            ('\u5c0f\u4e03', 'dog', '\u91d1\u6bdb', 26, 'male', 'large', rescue_cases[4], '\u4e2d\u56fd', '\u6e56\u5317\u7701', '\u6b66\u6c49\u5e02', '\u6b66\u660c\u533a', Decimal('30.592800'), Decimal('114.305500'), 'https://images.unsplash.com/photo-1552053831-71594a27632d?w=800'),
+            ('\u7cd6\u8c46', 'cat', '\u5e03\u5076\u732b', 18, 'female', 'small', None, '\u4e2d\u56fd', '\u5c71\u4e1c\u7701', '\u9752\u5c9b\u5e02', '\u5d02\u5c71\u533a', Decimal('36.067100'), Decimal('120.382600'), 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=800'),
+            ('\u5c0f\u8c46', 'dog', '\u6bd4\u718a', 9, 'male', 'small', None, '\u4e2d\u56fd', '\u798f\u5efa\u7701', '\u53a6\u95e8\u5e02', '\u601d\u660e\u533a', Decimal('24.479800'), Decimal('118.089400'), 'https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?w=800'),
+            ('\u556a\u55d2', 'rabbit', '\u57cb\u7f57\u5154', 11, 'female', 'small', None, '\u4e2d\u56fd', '\u9655\u897f\u7701', '\u897f\u5b89\u5e02', '\u96c1\u5854\u533a', Decimal('34.341600'), Decimal('108.939800'), 'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=800'),
+            ('\u660e\u660e', 'bird', '\u7384\u51e4', 16, 'unknown', 'small', None, '\u4e2d\u56fd', '\u6cb3\u5357\u7701', '\u90d1\u5dde\u5e02', '\u4e2d\u539f\u533a', Decimal('34.746600'), Decimal('113.625400'), 'https://images.unsplash.com/photo-1444464666168-49d633b86797?w=800'),
+            ('\u9ed1\u59ae', 'cat', '\u66fc\u57fa\u5eb7', 15, 'female', 'small', None, '\u4e2d\u56fd', '\u4e91\u5357\u7701', '\u6606\u660e\u5e02', '\u4e94\u534e\u533a', Decimal('25.038900'), Decimal('102.718300'), 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=800'),
+            ('\u5c0f\u72fc', 'dog', '\u4e2d\u534e\u7530\u56ed\u72ac', 30, 'male', 'medium', None, '\u4e2d\u56fd', '\u7518\u8083\u7701', '\u5170\u5dde\u5e02', '\u57ce\u5173\u533a', Decimal('36.061100'), Decimal('103.834300'), 'https://images.unsplash.com/photo-1518717758536-85ae29035b6d?w=800'),
+        ]
+        extra_pets = []
+        for (
+            name, species, breed, age_months, gender, size_category, rescue_case,
+            country, province, city, district, lat, lon, photo_url
+        ) in pet_specs:
+            pet, _ = PetProfile.objects.update_or_create(
+                name=name,
+                defaults={
+                    'rescue_case': rescue_case,
+                    'species': species,
+                    'breed': breed,
+                    'age_months': age_months,
+                    'gender': gender,
+                    'size_category': size_category,
+                    'health_status': '\u5065\u5eb7\uff0c\u5df2\u5b8c\u6210\u57fa\u7840\u75ab\u82d7',
+                    'description': f'{name}\u6027\u683c\u53cb\u597d\uff0c\u9002\u5408\u5bb6\u5ead\u7ec8\u8eab\u9886\u517b\u3002',
+                    'photo_url': photo_url,
+                    'country': country,
+                    'province': province,
+                    'city': city,
+                    'district': district,
+                    'location_text': f'{province}{city}{district}',
+                    'latitude': lat,
+                    'longitude': lon,
+                    'adoption_status': 'available',
+                    'is_public': True,
+                },
+            )
+            extra_pets.append(pet)
+
+        if extra_pets:
+            for idx, applicant in enumerate(demo_users[:6]):
+                pet = extra_pets[idx % len(extra_pets)]
+                AdoptApplication.objects.update_or_create(
+                    applicant=applicant,
+                    pet=pet,
+                    defaults={
+                        'message': '\u8ba4\u540c\u79d1\u5b66\u5582\u517b\uff0c\u6709\u957f\u671f\u966a\u4f34\u80fd\u529b\uff0c\u613f\u610f\u914d\u5408\u56de\u8bbf\u3002',
+                        'online_status': 'pending' if idx % 2 == 0 else 'approved',
+                        'auditor': admin if idx % 2 == 1 else None,
+                        'audited_at': timezone.now() if idx % 2 == 1 else None,
+                    },
+                )
+
+        lf_specs = [
+            (demo_users[5], 'lost', '\u72d7', '\u897f\u5b89\u5e02\u96c1\u5854\u533a\u5c0f\u5be8\u4e1c\u8def', '\u9ec4\u767d\u67ef\u57fa\uff0c\u7ea2\u8272\u9879\u5708', Decimal('34.223500'), Decimal('108.953100'), Decimal('600.00'), '13900000011', ['https://images.unsplash.com/photo-1561037404-61cd46aa615b?w=800']),
+            (demo_users[6], 'found', '\u732b', '\u6d4e\u5357\u5e02\u5386\u4e0b\u533a\u6cc9\u57ce\u8def', '\u7070\u767d\u82f1\u77ed\uff0c\u80c6\u5c0f\u4eb2\u4eba', Decimal('36.651200'), Decimal('117.120100'), Decimal('0'), '13900000012', ['https://images.unsplash.com/photo-1511044568932-338cba0ad803?w=800']),
+            (demo_users[7], 'lost', '\u72d7', '\u90d1\u5dde\u5e02\u4e8c\u4e03\u533a\u5927\u5b66\u8def', '\u9ed1\u8272\u7530\u56ed\u72ac\uff0c\u53f3\u8033\u5c16\u7f3a', Decimal('34.720300'), Decimal('113.650000'), Decimal('300.00'), '13900000013', ['https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800']),
+            (demo_users[8], 'found', '\u732b', '\u6606\u660e\u5e02\u4e94\u534e\u533a\u5357\u5c4f\u8857', '\u4e09\u82b1\u6bcd\u732b\uff0c\u9879\u5708\u4e0a\u6709\u94c3\u94db', Decimal('25.038900'), Decimal('102.718300'), Decimal('0'), '13900000014', ['https://images.unsplash.com/photo-1495360010541-f48722b34f7d?w=800']),
+            (demo_users[9], 'lost', '\u72d7', '\u53a6\u95e8\u5e02\u601d\u660e\u533a\u4e2d\u5c71\u8def', '\u767d\u8272\u6bd4\u718a\uff0c\u84dd\u8272\u80f8\u80cc', Decimal('24.479800'), Decimal('118.089400'), Decimal('1000.00'), '13900000015', ['https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?w=800']),
+        ]
+        for publisher, post_type, pet_species, address_text, features, lat, lon, reward, phone, photo_urls in lf_specs:
+            LostFoundPost.objects.update_or_create(
+                publisher=publisher,
+                post_type=post_type,
+                pet_species=pet_species,
+                address_text=address_text,
+                defaults={
+                    'features': features,
+                    'photo_urls': photo_urls,
+                    'latitude': lat,
+                    'longitude': lon,
+                    'reward_amount': reward,
+                    'contact_phone': phone,
+                    'status': 'searching',
+                },
+            )
+
+        post_specs = [
+            (demo_users[0], '\u5317\u4eac\u987a\u4e49\u6551\u52a9\u72ac\u4e34\u65f6\u4e2d\u8f6c\u6c42\u52a9', 'rescue_share', '\u4eca\u5929\u63a5\u5230\u4e24\u53ea\u7530\u56ed\u72ac\uff0c\u4e34\u65f6\u4e2d\u8f6c\u538b\u529b\u8f83\u5927\uff0c\u6c42\u5927\u5bb6\u63a8\u8350\u5bc4\u517b\u8d44\u6e90\u3002', ['https://images.unsplash.com/photo-1517849845537-4d257902454a?w=800']),
+            (demo_users[1], '\u4e0a\u6d77\u5e02\u533a\u627e\u5230\u53d7\u60ca\u82f1\u77ed\u732b\uff0c\u5df2\u9001\u533b', 'help_request', '\u5728\u9646\u5bb6\u5634\u5730\u94c1\u7ad9\u9644\u8fd1\u627e\u5230\u4e00\u53ea\u82f1\u77ed\u732b\uff0c\u5df2\u4e0a\u4f20\u56fe\u7247\uff0c\u82e5\u6709\u4e3b\u8bf7\u5c3d\u5feb\u8054\u7cfb\u3002', ['https://images.unsplash.com/photo-1511044568932-338cba0ad803?w=800']),
+            (demo_users[2], '\u5e7f\u5dde\u9886\u517b\u7ecf\u9a8c\uff1a\u6210\u5e74\u72ac\u6bd4\u5e7c\u72ac\u66f4\u9002\u5408\u4e0a\u73ed\u65cf', 'pet_experience', '\u6211\u5bb6\u9886\u517b\u6210\u5e74\u67f4\u72ac 3 \u4e2a\u6708\uff0c\u6027\u683c\u7a33\u5b9a\uff0c\u8f83\u5c11\u62c6\u5bb6\uff0c\u63a8\u8350\u7ed9\u4e0a\u73ed\u65cf\u3002', ['https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=800']),
+            (demo_users[3], '\u676d\u5dde\u7edd\u80b2\u8855\u533a\u9879\u76ee\u5fd7\u613f\u8005\u62db\u52df', 'general', '\u5468\u672b\u5c06\u8fdb\u884c\u8857\u533a TNR \u9879\u76ee\uff0c\u9700\u8981\u6293\u6355\u3001\u966a\u62a4\u3001\u5ba3\u4f20\u5fd7\u613f\u8005\uff0c\u6b22\u8fce\u62a5\u540d\u3002', ['https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=800']),
+            (demo_users[4], '\u6b66\u6c49\u6551\u52a9\u7ad9\u7269\u8d44\u6e05\u5355\u66f4\u65b0', 'rescue_share', '\u76ee\u524d\u7f3a\u5c11\u5e7c\u72ac\u5976\u7c89\uff0c\u732b\u7802\uff0c\u4e00\u6b21\u6027\u5c3f\u57ab\u4e0e\u5916\u7528\u6d88\u6bd2\u55b7\u96fe\uff0c\u611f\u8c22\u5927\u5bb6\u652f\u6301\u3002', ['https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?w=800']),
+        ]
+        for author, title, category, content, image_urls in post_specs:
+            post, _ = CommunityPost.objects.update_or_create(
+                author=author,
+                title=title,
+                defaults={
+                    'category': category,
+                    'content': content,
+                    'image_urls': image_urls,
+                },
+            )
+            PostLike.objects.get_or_create(post=post, user=admin)
+            CommunityComment.objects.get_or_create(
+                post=post,
+                author=user,
+                parent=None,
+                content='\u5df2\u7ecf\u5e2e\u4f60\u8f6c\u53d1\uff0c\u5e0c\u671b\u66f4\u591a\u4eba\u770b\u5230\u8fd9\u6761\u4fe1\u606f\u3002',
+            )
 
         for post in CommunityPost.objects.all():
             like_ct = PostLike.objects.filter(post=post).count()

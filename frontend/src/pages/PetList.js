@@ -333,6 +333,12 @@ const PetList = () => {
     setSearch(searchText.trim());
   };
 
+  const handleCustomAgeInput = (setter) => (event) => {
+    // Use digit-only text input to avoid numpad one-key auto-confirm issues.
+    const next = event.target.value.replace(/[^\d]/g, '');
+    setter(next);
+  };
+
   const handleNearbySearch = () => {
     if (!navigator.geolocation) {
       setError('当前浏览器不支持定位，请更换浏览器重试。');
@@ -546,22 +552,24 @@ const PetList = () => {
               <>
                 <div className="col-6 col-md-2">
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     className="form-control"
                     placeholder="最小月龄"
                     value={customAgeMin}
-                    onChange={(e) => setCustomAgeMin(e.target.value)}
+                    onChange={handleCustomAgeInput(setCustomAgeMin)}
                   />
                 </div>
                 <div className="col-6 col-md-2">
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     className="form-control"
                     placeholder="最大月龄"
                     value={customAgeMax}
-                    onChange={(e) => setCustomAgeMax(e.target.value)}
+                    onChange={handleCustomAgeInput(setCustomAgeMax)}
                   />
                 </div>
               </>
